@@ -5,203 +5,314 @@ import {
   Interaction,
   EtapePipeline,
 } from '../types/crm.types';
+import { supabase } from './supabaseClient';
 
-const KEYS = {
-  entreprises: 'alpha_rh_crm_entreprises',
-  contacts: 'alpha_rh_crm_contacts',
-  opportunites: 'alpha_rh_crm_opportunites',
-  interactions: 'alpha_rh_crm_interactions',
-};
-
-function genId(): string {
-  return `crm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
-
-function getAll<T>(key: string): T[] {
-  const raw = localStorage.getItem(key);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveAll<T>(key: string, data: T[]): void {
-  localStorage.setItem(key, JSON.stringify(data));
-}
+const now = () => new Date().toISOString();
 
 // ─── Entreprises ──────────────────────────────────────────────────────────────
 
 export const entrepriseService = {
-  getAll: (): Entreprise[] => getAll<Entreprise>(KEYS.entreprises),
-  getById: (id: string): Entreprise | undefined =>
-    entrepriseService.getAll().find((e) => e.id === id),
+  getAll: async (): Promise<Entreprise[]> => {
+    const { data, error } = await supabase
+      .from('entreprises')
+      .select('*')
+      .order('raison_sociale');
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
 
-  create: (data: Omit<Entreprise, 'id' | 'created_at' | 'updated_at'>): Entreprise => {
-    const record: Entreprise = { ...data, id: genId(), created_at: now(), updated_at: now() };
-    const all = entrepriseService.getAll();
-    saveAll(KEYS.entreprises, [...all, record]);
+  getGlobalStats: async (): Promise<{ total: number; clients: number; prospects: number; caTotal: number }> => {
+    const { data: entData, error: entErr } = await supabase
+      .from('entreprises')
+      .select('statut_compte');
+    
+    const { data: missData, error: missErr } = await supabase
+      .from('missions_formateurs')
+      .select('montant_mission')
+      .eq('paiement_statut', 'paye');
+
+    if (entErr || missErr) return { total: 0, clients: 0, prospects: 0, caTotal: 0 };
+
+    return {
+      total: entData.length,
+      clients: entData.filter((e: any) => e.statut_compte === 'client').length,
+      prospects: entData.filter((e: any) => e.statut_compte === 'prospect').length,
+      caTotal: (missData || []).reduce((sum: number, m: any) => sum + (m.montant_mission || 0), 0)
+    };
+  },
+
+  getById: async (id: string): Promise<Entreprise | null> => {
+    const { data, error } = await supabase
+      .from('entreprises')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) { console.error(error); return null; }
+    return data;
+  },
+
+  create: async (data: Omit<Entreprise, 'id' | 'created_at' | 'updated_at'>): Promise<Entreprise | null> => {
+    const { data: record, error } = await supabase
+      .from('entreprises')
+      .insert({ ...data, updated_at: now() })
+      .select()
+      .single();
+    if (error) { console.error(error); return null; }
     return record;
   },
 
-  update: (id: string, data: Partial<Entreprise>): void => {
-    const all = entrepriseService.getAll().map((e) =>
-      e.id === id ? { ...e, ...data, updated_at: now() } : e
-    );
-    saveAll(KEYS.entreprises, all);
+  update: async (id: string, data: Partial<Entreprise>): Promise<boolean> => {
+    const { error } = await supabase
+      .from('entreprises')
+      .update({ ...data, updated_at: now() })
+      .eq('id', id);
+    return !error;
   },
 
-  delete: (id: string): void => {
-    saveAll(KEYS.entreprises, entrepriseService.getAll().filter((e) => e.id !== id));
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('entreprises')
+      .delete()
+      .eq('id', id);
+    return !error;
   },
 
-  search: (query: string, filtres?: { secteur?: string; statut?: string; ville?: string }): Entreprise[] => {
-    const q = query.toLowerCase();
-    return entrepriseService.getAll().filter((e) => {
-      const matchQuery =
-        !q ||
-        e.raison_sociale.toLowerCase().includes(q) ||
-        e.secteur_activite.toLowerCase().includes(q) ||
-        e.ville.toLowerCase().includes(q) ||
-        e.responsable_compte.toLowerCase().includes(q);
-
-      const matchSecteur = !filtres?.secteur || e.secteur_activite === filtres.secteur;
-      const matchStatut = !filtres?.statut || e.statut_compte === filtres.statut;
-      const matchVille = !filtres?.ville || e.ville === filtres.ville;
-
-      return matchQuery && matchSecteur && matchStatut && matchVille;
-    });
+  search: async (query: string, filtres?: { secteur?: string; statut?: string; ville?: string }): Promise<Entreprise[]> => {
+    let builder = supabase.from('entreprises').select('*');
+    if (query) builder = builder.ilike('raison_sociale', `%${query}%`);
+    if (filtres?.secteur) builder = builder.eq('secteur_activite', filtres.secteur);
+    if (filtres?.statut) builder = builder.eq('statut_compte', filtres.statut);
+    if (filtres?.ville) builder = builder.eq('ville', filtres.ville);
+    
+    const { data, error } = await builder.order('raison_sociale');
+    if (error) { console.error(error); return []; }
+    return data || [];
   },
 };
 
 // ─── Contacts ─────────────────────────────────────────────────────────────────
 
 export const contactService = {
-  getAll: (): Contact[] => getAll<Contact>(KEYS.contacts),
-  getById: (id: string): Contact | undefined =>
-    contactService.getAll().find((c) => c.id === id),
-  getByEntreprise: (entrepriseId: string): Contact[] =>
-    contactService.getAll().filter((c) => c.entreprise_id === entrepriseId),
+  getAll: async (): Promise<Contact[]> => {
+    const { data, error } = await supabase.from('contacts').select('*').order('nom');
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
 
-  create: (data: Omit<Contact, 'id' | 'created_at' | 'updated_at'>): Contact => {
-    const record: Contact = { ...data, id: genId(), created_at: now(), updated_at: now() };
-    saveAll(KEYS.contacts, [...contactService.getAll(), record]);
+  getByEntreprise: async (entrepriseId: string): Promise<Contact[]> => {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('entreprise_id', entrepriseId)
+      .order('nom');
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+
+  create: async (data: Omit<Contact, 'id' | 'created_at' | 'updated_at'>): Promise<Contact | null> => {
+    const { data: record, error } = await supabase
+      .from('contacts')
+      .insert({ ...data, updated_at: now() })
+      .select()
+      .single();
+    if (error) { console.error(error); return null; }
     return record;
   },
 
-  update: (id: string, data: Partial<Contact>): void => {
-    saveAll(
-      KEYS.contacts,
-      contactService.getAll().map((c) =>
-        c.id === id ? { ...c, ...data, updated_at: now() } : c
-      )
-    );
+  update: async (id: string, data: Partial<Contact>): Promise<boolean> => {
+    const { error } = await supabase
+      .from('contacts')
+      .update({ ...data, updated_at: now() })
+      .eq('id', id);
+    return !error;
   },
 
-  delete: (id: string): void => {
-    saveAll(KEYS.contacts, contactService.getAll().filter((c) => c.id !== id));
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase.from('contacts').delete().eq('id', id);
+    return !error;
   },
 
-  search: (query: string, entrepriseId?: string): Contact[] => {
-    const q = query.toLowerCase();
-    return contactService.getAll().filter((c) => {
-      const matchEntreprise = !entrepriseId || c.entreprise_id === entrepriseId;
-      const matchQuery =
-        !q ||
-        c.nom.toLowerCase().includes(q) ||
-        c.prenom.toLowerCase().includes(q) ||
-        c.fonction.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q);
-      return matchEntreprise && matchQuery;
-    });
+  search: async (query: string, entrepriseId?: string): Promise<Contact[]> => {
+    let builder = supabase.from('contacts').select('*');
+    if (query) {
+      builder = builder.or(`nom.ilike.%${query}%,prenom.ilike.%${query}%`);
+    }
+    if (entrepriseId) {
+      builder = builder.eq('entreprise_id', entrepriseId);
+    }
+    
+    const { data, error } = await builder.order('nom');
+    if (error) { console.error(error); return []; }
+    return data || [];
   },
 };
 
 // ─── Opportunités ─────────────────────────────────────────────────────────────
 
 export const opportuniteService = {
-  getAll: (): Opportunite[] => getAll<Opportunite>(KEYS.opportunites),
-  getById: (id: string): Opportunite | undefined =>
-    opportuniteService.getAll().find((o) => o.id === id),
-  getByEntreprise: (entrepriseId: string): Opportunite[] =>
-    opportuniteService.getAll().filter((o) => o.entreprise_id === entrepriseId),
-  getByEtape: (etape: EtapePipeline): Opportunite[] =>
-    opportuniteService.getAll().filter((o) => o.etape_pipeline === etape),
+  getAll: async (): Promise<Opportunite[]> => {
+    const { data, error } = await supabase.from('opportunites').select('*').order('created_at', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
 
-  create: (data: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>): Opportunite => {
-    const record: Opportunite = { ...data, id: genId(), created_at: now(), updated_at: now() };
-    saveAll(KEYS.opportunites, [...opportuniteService.getAll(), record]);
+  getMontantTotal: async (): Promise<number> => {
+    const { data, error } = await supabase
+      .from('opportunites')
+      .select('montant_estime')
+      .eq('statut_opportunite', 'ouverte');
+    if (error) return 0;
+    return data.reduce((sum: number, o: any) => sum + (o.montant_estime || 0), 0);
+  },
+
+  create: async (data: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>): Promise<Opportunite | null> => {
+    const { data: record, error } = await supabase
+      .from('opportunites')
+      .insert({ ...data, updated_at: now() })
+      .select()
+      .single();
+    if (error) { console.error(error); return null; }
     return record;
   },
 
-  update: (id: string, data: Partial<Opportunite>): void => {
-    saveAll(
-      KEYS.opportunites,
-      opportuniteService.getAll().map((o) =>
-        o.id === id ? { ...o, ...data, updated_at: now() } : o
-      )
-    );
+  update: async (id: string, data: Partial<Opportunite>): Promise<boolean> => {
+    const { error } = await supabase
+      .from('opportunites')
+      .update({ ...data, updated_at: now() })
+      .eq('id', id);
+    return !error;
   },
 
-  delete: (id: string): void => {
-    saveAll(KEYS.opportunites, opportuniteService.getAll().filter((o) => o.id !== id));
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase.from('opportunites').delete().eq('id', id);
+    return !error;
   },
 
-  search: (query: string, filtres?: { etape?: string; domaine?: string; responsable?: string }): Opportunite[] => {
-    const q = query.toLowerCase();
-    return opportuniteService.getAll().filter((o) => {
-      const matchQ =
-        !q ||
-        o.theme_programme.toLowerCase().includes(q) ||
-        o.domaine_formation.toLowerCase().includes(q) ||
-        o.besoin_detaille.toLowerCase().includes(q);
-      const matchEtape = !filtres?.etape || o.etape_pipeline === filtres.etape;
-      const matchDomaine = !filtres?.domaine || o.domaine_formation === filtres.domaine;
-      const matchResp = !filtres?.responsable || o.responsable_commercial === filtres.responsable;
-      return matchQ && matchEtape && matchDomaine && matchResp;
-    });
+  getByEntreprise: async (entrepriseId: string): Promise<Opportunite[]> => {
+    const { data, error } = await supabase
+      .from('opportunites')
+      .select('*')
+      .eq('entreprise_id', entrepriseId)
+      .order('created_at', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
   },
-
-  // Calcul montant total pipeline
-  getMontantTotal: (): number =>
-    opportuniteService
-      .getAll()
-      .filter((o) => o.statut_opportunite === 'ouverte')
-      .reduce((sum, o) => sum + (o.montant_estime || 0), 0),
 };
 
 // ─── Interactions ─────────────────────────────────────────────────────────────
 
 export const interactionService = {
-  getAll: (): Interaction[] =>
-    getAll<Interaction>(KEYS.interactions).sort(
-      (a, b) => new Date(b.date_interaction).getTime() - new Date(a.date_interaction).getTime()
-    ),
-  getById: (id: string): Interaction | undefined =>
-    interactionService.getAll().find((i) => i.id === id),
-  getByEntreprise: (entrepriseId: string): Interaction[] =>
-    interactionService.getAll().filter((i) => i.entreprise_id === entrepriseId),
-  getRelancesEnAttente: (): Interaction[] =>
-    interactionService.getAll().filter(
-      (i) => i.statut_relance === 'a_faire' && i.prochaine_relance
-    ),
+  getAll: async (): Promise<Interaction[]> => {
+    const { data, error } = await supabase.from('interactions').select('*').order('date_interaction', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
 
-  create: (data: Omit<Interaction, 'id' | 'created_at' | 'updated_at'>): Interaction => {
-    const record: Interaction = { ...data, id: genId(), created_at: now(), updated_at: now() };
-    saveAll(KEYS.interactions, [...getAll<Interaction>(KEYS.interactions), record]);
+  create: async (data: Omit<Interaction, 'id' | 'created_at' | 'updated_at'>): Promise<Interaction | null> => {
+    const { data: record, error } = await supabase
+      .from('interactions')
+      .insert({ ...data, updated_at: now() })
+      .select()
+      .single();
+    if (error) { console.error(error); return null; }
     return record;
   },
 
-  update: (id: string, data: Partial<Interaction>): void => {
-    saveAll(
-      KEYS.interactions,
-      getAll<Interaction>(KEYS.interactions).map((i) =>
-        i.id === id ? { ...i, ...data, updated_at: now() } : i
-      )
-    );
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase.from('interactions').delete().eq('id', id);
+    return !error;
   },
 
-  delete: (id: string): void => {
-    saveAll(KEYS.interactions, getAll<Interaction>(KEYS.interactions).filter((i) => i.id !== id));
+  getByEntreprise: async (entrepriseId: string): Promise<Interaction[]> => {
+    const { data, error } = await supabase
+      .from('interactions')
+      .select('*')
+      .eq('entreprise_id', entrepriseId)
+      .order('date_interaction', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
   },
+
+  getByContact: async (contactId: string): Promise<Interaction[]> => {
+    const { data, error } = await supabase
+      .from('interactions')
+      .select('*')
+      .eq('contact_id', contactId)
+      .order('date_interaction', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+
+  getByOpportunite: async (opportuniteId: string): Promise<Interaction[]> => {
+    const { data, error } = await supabase
+      .from('interactions')
+      .select('*')
+      .eq('opportunite_id', opportuniteId)
+      .order('date_interaction', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+};
+
+// ─── Public Lead Submission ───────────────────────────────────────────────────
+
+export const publicService = {
+  submitPublicLead: async (formData: any): Promise<boolean> => {
+    try {
+      // 1. Create Enterprise
+      const { data: ent, error: entErr } = await supabase
+        .from('entreprises')
+        .insert({
+          raison_sociale: formData.entreprise,
+          email: formData.email,
+          telephone: formData.telephone,
+          statut_compte: 'prospect',
+          source_acquisition: 'Site Web Landing Page',
+          secteur_activite: formData.type_activite,
+          updated_at: now()
+        })
+        .select()
+        .single();
+      
+      if (entErr) throw entErr;
+
+      // 2. Create Contact
+      const { data: contact, error: contactErr } = await supabase
+        .from('contacts')
+        .insert({
+          entreprise_id: ent.id,
+          nom: formData.nom,
+          email: formData.email,
+          telephone: formData.telephone,
+          fonction: formData.fonction,
+          updated_at: now()
+        })
+        .select()
+        .single();
+
+      if (contactErr) throw contactErr;
+
+      // 3. Create Opportunity
+      const { error: oppErr } = await supabase
+        .from('opportunites')
+        .insert({
+          entreprise_id: ent.id,
+          contact_id: contact.id,
+          theme_programme: formData.theme,
+          domaine_formation: formData.domaine,
+          nombre_participants: parseInt(formData.nombre_participants) || 0,
+          besoin_detaille: `Format: ${formData.format} | Période: ${formData.periode} | Profil: ${formData.profil} | Message: ${formData.message}`,
+          type_opportunite: 'sur_mesure',
+          etape_pipeline: 'prospection',
+          updated_at: now()
+        });
+
+      if (oppErr) throw oppErr;
+
+      return true;
+    } catch (e) {
+      console.error('Error submitting lead:', e);
+      return false;
+    }
+  }
 };

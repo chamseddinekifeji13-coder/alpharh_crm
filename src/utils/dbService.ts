@@ -1,88 +1,162 @@
-import { Formateur, ExtractionStatus } from '../types/trainer.types';
+import { Formateur, Authorization, FormationBase, FormationComplementaire, ExperienceProfessionnelle, ExperienceFormation } from '../types/trainer.types';
+import { supabase } from './supabaseClient';
 
-const STORAGE_KEY = 'alpha_rh_cvtheque_data';
+const sanitizeData = (data: any) => {
+  const sanitized = { ...data };
+  Object.keys(sanitized).forEach(key => {
+    const val = sanitized[key];
+    if (val === '' || (typeof val === 'number' && isNaN(val))) {
+      sanitized[key] = null;
+    }
+  });
+  return sanitized;
+};
 
 export const dbService = {
   // Get all formateurs
-  getAll: (): Formateur[] => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+  getAll: async (): Promise<Formateur[]> => {
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching trainers:', error);
+      return [];
+    }
+    return data || [];
   },
 
-  // Get single formateur
-  getById: (id: string): Formateur | undefined => {
-    return dbService.getAll().find(f => f.id === id);
+  // Formateurs disponibles (vue rapide)
+  getDisponibles: async (): Promise<Formateur[]> => {
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('*')
+      .eq('disponibilite_statut', 'disponible')
+      .order('niveau_priorite', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching available trainers:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  // Get single formateur with relationships and mapping to frontend types
+  getById: async (id: string): Promise<Formateur | null> => {
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('*, trainer_formations(*), trainer_experiences(*)')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching trainer details:', error);
+      return null;
+    }
+
+    // Mapping flat tables to nested types
+    const formations = data.trainer_formations || [];
+    const experiences = data.trainer_experiences || [];
+
+    return {
+      ...data,
+      autorisations: experiences.filter((e: any) => e.type_experience === 'autorisation').map((e: any) => ({
+        id: e.id,
+        annee: e.annee || '',
+        date_debut: e.date_debut,
+        date_fin: e.date_fin,
+        objet_autorisation: e.fonction_theme,
+        observations: e.domaine_formation
+      })),
+      formations_base: formations.filter((f: any) => f.type_formation === 'base').map((f: any) => ({
+        id: f.id,
+        diplome: f.diplome_intitule,
+        specialte: f.specialite,
+        etablissement: f.etablissement,
+        annee_obtention: f.annee_obtention
+      })),
+      formations_complementaires: formations.filter((f: any) => f.type_formation !== 'base').map((f: any) => ({
+        id: f.id,
+        type_formation: f.type_formation,
+        intitule: f.diplome_intitule,
+        specialite: f.specialite,
+        etablissement: f.etablissement,
+        annee_obtention: f.annee_obtention
+      })),
+      experiences_professionnelles: experiences.filter((e: any) => e.type_experience === 'professionnelle').map((e: any) => ({
+        id: e.id,
+        organisme_employeur: e.organisme_entreprise,
+        fonction_occupee: e.fonction_theme,
+        date_debut: e.date_debut,
+        date_fin: e.date_fin
+      })),
+      experiences_formation: experiences.filter((e: any) => e.type_experience === 'formation').map((e: any) => ({
+        id: e.id,
+        theme_formation: e.fonction_theme,
+        domaine_formation: e.domaine_formation,
+        entreprise_beneficiaire: e.organisme_entreprise,
+        date_debut: e.date_debut,
+        date_fin: e.date_fin
+      }))
+    };
   },
 
   // Save or Update formateur
-  save: (formateur: Formateur): void => {
-    const all = dbService.getAll();
-    const index = all.findIndex(f => f.id === formateur.id);
-    
-    if (index !== -1) {
-      all[index] = { ...formateur, updated_at: new Date().toISOString() };
-    } else {
-      all.push({ 
-        ...formateur, 
-        created_at: new Date().toISOString(), 
+  save: async (formateur: Partial<Formateur>): Promise<Formateur | null> => {
+    // Extract nested data (saved separately in future versions)
+    const { autorisations, formations_base, formations_complementaires, experiences_professionnelles, experiences_formation, ...parentData } = formateur as any;
+
+    if (!parentData.id || parentData.id.length < 10) delete parentData.id;
+
+    // Sanitization to avoid invalid dates/numbers
+    const sanitized = sanitizeData(parentData);
+
+    const { data, error } = await supabase
+      .from('trainers')
+      .upsert({ 
+        ...sanitized, 
         updated_at: new Date().toISOString() 
-      });
-    }
+      })
+      .select()
+      .single();
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    if (error) {
+      console.error('Error saving trainer:', error);
+      throw error;
+    }
+    return data;
   },
 
-  // Delete formateur
-  delete: (id: string): void => {
-    const all = dbService.getAll().filter(f => f.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  delete: async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('trainers')
+      .delete()
+      .eq('id', id);
+    return !error;
   },
 
-  // Duplicate detection logic
-  checkDuplicates: (data: Partial<Formateur>): { type: string; matches: Formateur[] } | null => {
-    const all = dbService.getAll();
-    
-    // 1. Check by CIN
-    if (data.cin_passeport) {
-      const match = all.filter(f => f.cin_passeport === data.cin_passeport);
-      if (match.length > 0) return { type: 'CIN/Passeport', matches: match };
-    }
-    
-    // 2. Check by Email
-    if (data.email) {
-      const match = all.filter(f => f.email?.toLowerCase() === data.email?.toLowerCase());
-      if (match.length > 0) return { type: 'Email', matches: match };
-    }
-    
-    // 3. Check by Nom + Prénom + GSM
-    if (data.nom && data.prenom && data.gsm) {
-      const match = all.filter(f => 
-        f.nom.toLowerCase() === data.nom?.toLowerCase() && 
-        f.prenom.toLowerCase() === data.prenom?.toLowerCase() && 
-        f.gsm === data.gsm
-      );
-      if (match.length > 0) return { type: 'Combinaison Nom/Prénom/GSM', matches: match };
-    }
-    
-    return null;
+  search: async (query: string): Promise<Formateur[]> => {
+    const q = `%${query}%`;
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('*')
+      .or(`nom.ilike.${q},prenom.ilike.${q},mots_cles_formation.ilike.${q},domaines_couverts.ilike.${q}`);
+    return data || [];
   },
 
-  // Global Search
-  search: (query: string): Formateur[] => {
-    const q = query.toLowerCase();
-    return dbService.getAll().filter(f => 
-      f.nom.toLowerCase().includes(q) ||
-      f.prenom.toLowerCase().includes(q) ||
-      f.cin_passeport.includes(q) ||
-      f.email.toLowerCase().includes(q) ||
-      f.gsm.includes(q) ||
-      f.statut_professionnel.toLowerCase().includes(q) ||
-      f.domaines_couverts.toLowerCase().includes(q) ||
-      f.mots_cles_formation.toLowerCase().includes(q) ||
-      f.experiences_formation.some(exp => 
-        exp.theme_formation.toLowerCase().includes(q) || 
-        exp.entreprise_beneficiaire.toLowerCase().includes(q)
-      )
-    );
-  }
+  // Mise à jour rapide d'un seul champ (note interne, statut, etc.)
+  updateField: async (id: string, fields: Partial<Formateur>): Promise<boolean> => {
+    const sanitized = sanitizeData(fields);
+    const { error } = await supabase
+      .from('trainers')
+      .update({ ...sanitized, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating trainer field:', error);
+      return false;
+    }
+    return true;
+  },
 };

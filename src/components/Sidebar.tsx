@@ -10,17 +10,31 @@ import {
   Target,
   MessageSquare,
   UserCircle2,
+  FileText,
 } from 'lucide-react';
 
 import '../App.css';
 
-const Sidebar = () => {
+import { useConfig } from '../context/ConfigContext';
+
+interface SidebarProps {
+  onLogout?: () => void;
+}
+
+const Sidebar = ({ onLogout }: SidebarProps) => {
+  const { config } = useConfig();
+
   return (
     <aside className="sidebar dark-glass">
       <div className="sidebar-header">
-        <div className="brand">
-          <span className="logo-icon">α</span>
-          <span className="logo-text">ALPHA RH</span>
+        <img 
+          src={config?.company_logo_url || '/logo.png'} 
+          alt="Company Logo" 
+          className="sidebar-logo" 
+        />
+        <div className="sidebar-brand">
+          <h2>{config?.company_name || 'Alpha RH'}</h2>
+          <span className="sidebar-badge">CRM Cloud</span>
         </div>
         <p className="sidebar-subtitle">CVthèque & CRM</p>
       </div>
@@ -47,16 +61,7 @@ const Sidebar = () => {
         </NavLink>
 
         {/* ─── Séparateur CRM ─── */}
-        <div style={{
-          margin: '0.75rem 0 0.5rem',
-          padding: '0.5rem 1.25rem 0.25rem',
-          fontSize: '0.65rem',
-          fontWeight: 700,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: '#d4af37',
-          borderTop: '1px solid rgba(255,255,255,0.1)',
-        }}>
+        <div className="sidebar-separator-crm">
           CRM Commercial
         </div>
 
@@ -79,14 +84,19 @@ const Sidebar = () => {
           <MessageSquare size={20} />
           <span>Interactions</span>
         </NavLink>
+
+        <NavLink to="/crm/devis" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <FileText size={20} />
+          <span>Devis & Propositions</span>
+        </NavLink>
       </nav>
 
       <div className="sidebar-footer">
-        <div className="nav-item">
+        <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Settings size={20} />
           <span>Paramètres</span>
-        </div>
-        <div className="nav-item logout">
+        </NavLink>
+        <div className="nav-item logout" onClick={onLogout}>
           <LogOut size={20} />
           <span>Déconnexion</span>
         </div>

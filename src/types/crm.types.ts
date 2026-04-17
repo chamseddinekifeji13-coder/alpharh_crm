@@ -26,6 +26,8 @@ export type TypeInteraction =
   | 'note';
 
 export type StatutRelance = 'a_faire' | 'effectuee' | 'annulee';
+export type PrioriteOpp = 'haute' | 'moyenne' | 'faible';
+export type StatutValidationOpp = 'brouillon' | 'en_attente' | 'valide';
 
 // ─── Entreprise ───────────────────────────────────────────────────────────────
 
@@ -37,10 +39,13 @@ export interface Entreprise {
   adresse: string;
   ville: string;
   pays: string;
+  telephone: string;
+  email: string;
   site_web: string;
   statut_compte: StatutCompte;
   source_acquisition: string;
   responsable_compte: string;
+  identifiant_fiscal?: string;
   remarques: string;
   created_at: string;
   updated_at: string;
@@ -71,6 +76,7 @@ export interface Opportunite {
   entreprise_id: string;
   contact_id: string;
   type_opportunite: TypeOpportunite;
+  programme_demande: string;
   theme_programme: string;
   domaine_formation: string;
   besoin_detaille: string;
@@ -84,6 +90,12 @@ export interface Opportunite {
   date_prochaine_action: string;
   responsable_commercial: string;
   statut_opportunite: 'ouverte' | 'gagnee' | 'perdue';
+  priorite: PrioriteOpp;
+  statut_validation: StatutValidationOpp;
+  source_opportunite?: string;
+  date_limite_depot?: string;
+  montant_final?: number;
+  commentaire_interne?: string;
   created_at: string;
   updated_at: string;
 }
@@ -157,3 +169,56 @@ export const PIPELINE_STAGES: EtapePipeline[] = [
   'gagnee',
   'perdue',
 ];
+
+export const PRIORITE_LABELS: Record<PrioriteOpp, string> = {
+  haute: 'Urgent / Haute',
+  moyenne: 'Moyenne',
+  faible: 'Faible',
+};
+
+export const STATUT_VALIDATION_LABELS: Record<StatutValidationOpp, string> = {
+  brouillon: 'Brouillon',
+  en_attente: 'En attente',
+  valide: 'Validé',
+};
+
+// ─── Devis (Nouveau Phase 7) ──────────────────────────────────────────────────
+
+export type StatutDevis = 'brouillon' | 'envoye' | 'accepte' | 'refuse' | 'expire';
+
+export interface Devis {
+  id: string;
+  numero_devis: string;
+  entreprise_id: string;
+  opportunite_id?: string;
+  date_emission: string;
+  date_validite: string;
+  objet: string;
+  montant_ht: number;
+  tva_taux: number;
+  montant_ttc: number;
+  statut: StatutDevis;
+  remarques_internes?: string;
+  pdf_url?: string;
+  created_at: string;
+  updated_at: string;
+  // Join data
+  entreprise?: { raison_sociale: string };
+  opportunite?: { theme_programme: string };
+}
+
+export const STATUT_DEVIS_LABELS: Record<StatutDevis, string> = {
+  brouillon: 'Brouillon',
+  envoye: 'Envoyé',
+  accepte: 'Accepté',
+  refuse: 'Refusé',
+  expire: 'Expiré',
+};
+
+export const STATUT_DEVIS_COLORS: Record<StatutDevis, string> = {
+  brouillon: '#6b7280', // Gray
+  envoye: '#3b82f6',    // Blue
+  accepte: '#10b981',   // Green
+  refuse: '#ef4444',    // Red
+  expire: '#9ca3af',    // Light Gray
+};

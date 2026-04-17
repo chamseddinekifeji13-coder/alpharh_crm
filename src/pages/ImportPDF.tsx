@@ -9,6 +9,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseCVText } from '../utils/pdfParser';
+import { extractTextFromPDF } from '../utils/pdfExtractor';
+import { toast } from 'react-hot-toast';
 
 import '../App.css';
 
@@ -25,47 +27,50 @@ const ImportPDF = () => {
   };
 
   const startImport = async () => {
-    // If no file (demo mode), we use a mock PDF URL
-    const isDemo = !file;
-    
-    setStatus('uploading');
-    await new Promise(r => setTimeout(r, 1500));
-    
-    setStatus('parsing');
-    await new Promise(r => setTimeout(r, 2000));
-    
-    // In a real V1, we'd store the file in a state or temporary storage
-    const pdfUrl = file ? URL.createObjectURL(file) : '/mocks/cv_badr.pdf';
+    try {
+      setStatus('uploading');
+      setExtractedData(null); // Clear previous data
+      
+      const pdfUrl = file ? URL.createObjectURL(file) : '/mocks/cv_badr.pdf';
+      
+      let textContent = '';
+      
+      if (file) {
+        setStatus('parsing');
+        textContent = await extractTextFromPDF(file);
+      } else {
+        // Fallback mock only for demo mode
+        await new Promise(r => setTimeout(r, 1000));
+        setStatus('parsing');
+        await new Promise(r => setTimeout(r, 1000));
+        textContent = `
+          CURRICULUM VITAE DU FORMATEUR
+          (Modèle Officiel CNFCPP - Tunisie)
+          Nom et Prénom : Bahloul Badr
+          Nationalité : Tunisienne
+          Date et Lieu de Naissance : 15/04/1982 à Sfax
+          N° CIN : 12345678
+          Email : badr.bahloul@email.tn
+          Tél : 98 123 456
+          Employeur Actuel : Alpha Engineering
+        `;
+      }
+      
+      const data = parseCVText(textContent);
+      
+      const finalizedData = {
+        ...data,
+        cv_pdf_url: pdfUrl
+      };
 
-    const mockText = `
-      CURRICULUM VITAE DU FORMATEUR
-      (Modèle Officiel CNFCPP - Tunisie)
-
-      I. IDENTITÉ ET SITUATION ACTUELLE
-      Nom et Prénom : Bahloul Badr
-      Nationalité : Tunisienne
-      Date et Lieu de Naissance : 15/04/1982 à Sfax
-      Grade : Consultant Senior
-      N° CIN : 12345678
-      Email : badr.bahloul@email.tn
-      Tél : 98 123 456
-      Adresse Personnelle : Sfax, Tunisie
-      Situation Administrative : Privé
-      Employeur Actuel : Alpha Engineering
-      Adresse Employeur : Route de Tunis km 5, Sfax
-      Tél Employeur : 74 000 000
-    `;
-    
-    const data = parseCVText(mockText);
-    
-    // On ajoute le lien vers le PDF stocké (temporaire ou mock)
-    const finalizedData = {
-      ...data,
-      cv_pdf_url: pdfUrl
-    };
-
-    setExtractedData(finalizedData);
-    setStatus('success');
+      setExtractedData(finalizedData);
+      setStatus('success');
+      toast.success('CV analysé avec succès !');
+    } catch (err: any) {
+      console.error(err);
+      setStatus('error');
+      toast.error(err.message || "Erreur lors de l'analyse du PDF");
+    }
   };
 
   const handleGoToValidation = () => {
@@ -147,8 +152,8 @@ const ImportPDF = () => {
                     <strong>{extractedData?.nom} {extractedData?.prenom}</strong>
                   </div>
                   <div className="preview-field">
-                    <span>Abstract :</span>
-                    <p className="truncated-text">{extractedData?.abstract_experience}</p>
+                    <span>Résumé :</span>
+                    <p className="truncated-text">{extractedData?.resume_profil}</p>
                   </div>
                 </div>
 

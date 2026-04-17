@@ -17,28 +17,53 @@ export const parseCVText = (text: string): Partial<Formateur> => {
   };
 
   // 1. Extraction d'Identité (Inchangé)
-  const nameMatch = text.match(/(?:Nom et Prénom|Nom|Prénom)\s* :*\s*([^\n\r]+)/i);
+  const nameMatch = text.match(/(?:Nom et Prénom|Nom|Prénom)\s* :*\s*([^\n\r.]+?)(?=\s*(?:Nationalité|Date|N°|CIN|Email|GSM|Adresse|$))/i);
   if (nameMatch) {
     const full = nameMatch[1].trim();
     const parts = full.split(' ');
-    data.prenom = parts[1] || '';
     data.nom = parts[0] || '';
+    data.prenom = parts.slice(1).join(' ') || '';
   }
 
   data.email = text.match(/[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}/)?.[0] || '';
-  data.gsm = text.match(/(?:\+216|GSM|Tél|Tel)\s* :*\s*([\d\s]{8,})/i)?.[1]?.trim() || '';
-  data.cin_passeport = text.match(/(?:CIN|Passeport|N° CIN)\s* :*\s*(\d{8})/i)?.[1] || '';
-  data.nationalite = text.match(/Nationalité\s* :*\s*([^\n\r]+)/i)?.[1]?.trim() || 'Tunisienne';
+  data.gsm = text.match(/(?:\+216|GSM|Tél|Tel)\s* :*\s*([\d\s]{8,15})(?=\s*(?:Adresse|Email|Employeur|$))/i)?.[1]?.trim() || '';
   
+  // Improved CIN Regex: stop at known labels
+  const cinMatch = text.match(/(?:CIN|Passeport|N° CIN|Carte d'identité)\s*[:\s]*([\d\s]{8,12})(?=\s*(?:Mail|Email|GSM|Date|$))/i);
+  data.cin_passeport = cinMatch ? cinMatch[1].replace(/\s/g, '').substring(0, 10) : '';
+  
+  // Improved Address: stop at known labels
+  data.adresse = text.match(/Adresse\s* :*\s*([^\n\r.]+?)(?=\s*(?:Employeur|Tél|Email|GSM|$))/i)?.[1]?.trim() || '';
+  
+  // Improved Status: match keywords
+  const statusMatch = text.match(/(?:Statut|Secteur)\s* :*\s*([^\n\r]+?)(?=\s*(?:Employeur|Adresse|Tél|$))/i);
+  if (statusMatch) {
+    const s = statusMatch[1].toLowerCase();
+    if (s.includes('pub')) data.statut_professionnel = 'Public';
+    else if (s.includes('ind') || s.includes('lib')) data.statut_professionnel = 'Indépendant';
+    else data.statut_professionnel = 'Privé';
+  }
+  
+  // Improved Nationality: stop at "Date" or newline
+  data.nationalite = text.match(/Nationalité\s* :*\s*([^\n\r]+?)(?=\s*(?:Date|Lieu|N°|CIN|Email|$))/i)?.[1]?.trim() || 'Tunisienne';
+  
+  const formatDateToISO = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      // Assuming DD/MM/YYYY
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return dateStr;
+  };
+
+  // 2. Extraction Dynamique (V1.1)
   const birthMatch = text.match(/Né(?:e)? le\s*([\d/]{10})/i) || text.match(/Date.*Naissance\s* :*\s*([\d/]{10})/i);
-  data.date_naissance = birthMatch?.[1] || '';
+  data.date_naissance = formatDateToISO(birthMatch?.[1] || '');
   
   data.lieu_naissance = text.match(/à\s+([A-Z][a-z]+)/)?.[1] || '';
-  data.adresse = text.match(/Adresse\s*(?:Personnelle)?\s* :*\s*([^\n\r]+)/i)?.[1]?.trim() || '';
 
-  // 2. Extraction Situation Professionnelle
-  data.employeur_actuel = text.match(/(?:Employeur|Société|Organisme)\s* :*\s*([^\n\r]+)/i)?.[1]?.trim() || '';
-  data.statut_professionnel = text.toLowerCase().includes('public') ? 'Public' : (text.toLowerCase().includes('indépendant') ? 'Indépendant' : 'Privé');
+  data.employeur_actuel = text.match(/(?:Employeur|Société|Organisme)\s* :*\s*([^\n\r.]+?)(?=\s*(?:Adresse|Tél|Email|$))/i)?.[1]?.trim() || '';
 
   // 3. Synthèse V1.1 (Scindée)
   

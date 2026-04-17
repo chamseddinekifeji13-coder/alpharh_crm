@@ -1,39 +1,65 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Target, Plus, X, Save, Edit2, Trash2, Search,
-  Users, Calendar, TrendingUp, Lightbulb, ChevronRight, ArrowRight
+  TrendingUp, Lightbulb, ChevronRight
 } from 'lucide-react';
 import {
   Opportunite, EtapePipeline, TypeOpportunite,
-  ETAPE_LABELS, ETAPE_COLORS, TYPE_OPPORTUNITE_LABELS, PIPELINE_STAGES
+  ETAPE_LABELS, ETAPE_COLORS, TYPE_OPPORTUNITE_LABELS, PIPELINE_STAGES, Entreprise, Contact, Interaction, TYPE_INTERACTION_LABELS
 } from '../../types/crm.types';
-import { opportuniteService, entrepriseService, contactService } from '../../utils/crmService';
+import { Formateur } from '../../types/trainer.types';
+import { opportuniteService, entrepriseService, contactService, interactionService } from '../../utils/crmService';
+import { missionService } from '../../utils/missionService';
+import { devisService } from '../../utils/devisService';
 import { dbService } from '../../utils/dbService';
+import { toast } from 'react-hot-toast';
+import { Shield, Clock, MessageSquare, History } from 'lucide-react';
 
 // ─── Suggestion de formateurs ─────────────────────────────────────────────────
 
-const getSuggestedTrainers = (theme: string, domaine: string) => {
+const getSuggestedTrainersAsync = async (theme: string, domaine: string) => {
   if (!theme && !domaine) return [];
-  const trainers = dbService.getAll();
+  const trainers = await dbService.getAll();
   const scored = trainers.map(t => {
     let score = 0;
     const th = theme.toLowerCase();
     const dom = domaine.toLowerCase();
-    if (dom && t.domaines_couverts?.toLowerCase().includes(dom)) score += 3;
-    if (th && t.mots_cles_formation?.toLowerCase().includes(th)) score += 2;
+
+    // Matching de base (domaines et thèmes)
+    if (dom && t.domaines_couverts?.toLowerCase().includes(dom)) score += 5;
+    if (th && t.mots_cles_formation?.toLowerCase().includes(th)) score += 4;
+    
+    // Bonus Intelligence (Nouveaux champs)
+    if (t.statut_formateur === 'actif') score += 5;
+    if (t.statut_formateur === 'en_veille') score += 2;
+    
+    // Qualité & Réactivité
+    if (t.score_qualite) score += (t.score_qualite * 1.5);
+    if (t.score_reactivite) score += t.score_reactivite;
+    
+    // Disponibilité & Conformité
+    if (t.disponibilite_statut === 'non_disponible') score -= 10;
+    if (t.disponibilite_statut === 'disponible') score += 3;
+    if (t.conformite_statut === 'non_conforme') score -= 15;
+    if (t.documents_complets === true) score += 2;
+
+    // Analyse textuelle du résumé
     if (th && t.resume_profil?.toLowerCase().includes(th)) score += 1;
     if (dom && t.resume_profil?.toLowerCase().includes(dom)) score += 1;
-    // Match mot à mot sur thème
+
+    // Matching par mots individuels
     th.split(/[\s,]+/).forEach(mot => {
       if (mot.length > 3) {
         if (t.domaines_couverts?.toLowerCase().includes(mot)) score += 1;
         if (t.mots_cles_formation?.toLowerCase().includes(mot)) score += 1;
       }
     });
-    return { formateur: t, score };
+
+    return { formateur: t, score: Math.round(score * 10) / 10 };
   });
-  return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+  return scored.filter(s => s.score > 5).sort((a, b) => b.score - a.score).slice(0, 6);
 };
 
 // ─── Formulaire Opportunité ───────────────────────────────────────────────────
@@ -46,159 +72,209 @@ const DOMAINES = [
 
 const emptyForm = (): Omit<Opportunite, 'id' | 'created_at' | 'updated_at'> => ({
   entreprise_id: '', contact_id: '', type_opportunite: 'intra',
-  theme_programme: '', domaine_formation: '', besoin_detaille: '',
+  programme_demande: '', theme_programme: '', domaine_formation: '', besoin_detaille: '',
   nombre_participants: 0, budget_estime: 0, date_prevue: '',
   etape_pipeline: 'prospection', probabilite: 20, montant_estime: 0,
   prochaine_action: '', date_prochaine_action: '',
   responsable_commercial: '', statut_opportunite: 'ouverte',
+  priorite: 'moyenne', statut_validation: 'brouillon',
 });
 
 interface OppFormProps {
   initial?: Opportunite | null;
   onSave: (d: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>) => void;
   onClose: () => void;
+  loading?: boolean;
 }
 
-const OppForm = ({ initial, onSave, onClose }: OppFormProps) => {
+const OppForm = ({ initial, onSave, onClose, loading }: OppFormProps) => {
+  const navigate = useNavigate();
   const [form, setForm] = useState(
     initial ? { ...initial } as Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>
     : emptyForm()
   );
   const set = (k: string, v: string | number) => setForm(f => ({ ...f, [k]: v }));
 
-  const entreprises = entrepriseService.getAll();
-  const contacts = form.entreprise_id
-    ? contactService.getByEntreprise(form.entreprise_id)
-    : [];
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [suggestions, setSuggestions] = useState<{ formateur: Formateur; score: number }[]>([]);
+  const [history, setHistory] = useState<Interaction[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
-  const suggestions = useMemo(() =>
-    getSuggestedTrainers(form.theme_programme, form.domaine_formation),
-    [form.theme_programme, form.domaine_formation]
-  );
+  useEffect(() => {
+    entrepriseService.getAll().then(setEntreprises);
+  }, []);
+
+  useEffect(() => {
+    if (form.entreprise_id) {
+      contactService.getByEntreprise(form.entreprise_id).then(setContacts);
+    } else {
+      setContacts([]);
+    }
+  }, [form.entreprise_id]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      getSuggestedTrainersAsync(form.theme_programme, form.domaine_formation).then(setSuggestions);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [form.theme_programme, form.domaine_formation]);
+
+  useEffect(() => {
+    if (initial?.id) {
+      setHistoryLoading(true);
+      interactionService.getByOpportunite(initial.id)
+        .then(data => setHistory(data.slice(0, 3)))
+        .finally(() => setHistoryLoading(false));
+    }
+  }, [initial]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+    <div className="rh-modal-overlay">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        style={{ background: 'white', borderRadius: '1rem', width: '100%', maxWidth: '800px', maxHeight: '92vh', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>
-            {initial ? 'Modifier l\'opportunité' : 'Nouvelle opportunité'}
-          </h2>
-          <button onClick={onClose}><X size={20} /></button>
+        className="rh-modal-content xl">
+        <div className="rh-modal-header">
+          <div className="rh-modal-header-info">
+            <div className="rh-modal-title-group">
+              <h2 className="rh-modal-title">
+                {initial ? 'Modifier l\'opportunité' : 'Nouvelle opportunité'}
+              </h2>
+              <span className="rh-modal-subtitle">Gestion du pipeline commercial & pédagogique</span>
+            </div>
+          </div>
+          <button onClick={onClose} title="Fermer" className="rh-modal-close"><X size={20} /></button>
         </div>
 
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* Formulaire - col gauche */}
-          <div style={{ flex: 1, padding: '1.5rem 2rem', overflow: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div style={{ gridColumn: '1/-1' }} className="form-group">
+        <div className="rh-modal-body rh-modal-body-split">
+          {/* Layout en deux colonnes conservé pour la richesse fonctionnelle */}
+          <div className="rh-form-column">
+            <div className="rh-form-grid">
+              <div className="rh-section-header">CRITÈRES & PRIORITÉ</div>
+              <div className="col-span-3 form-group">
+                <label>Étape pipeline</label>
+                <select aria-label="Étape du pipeline" value={form.etape_pipeline} onChange={e => set('etape_pipeline', e.target.value as EtapePipeline)} disabled={loading}>
+                  {PIPELINE_STAGES.map(s => <option key={s} value={s}>{ETAPE_LABELS[s]}</option>)}
+                </select>
+              </div>
+              <div className="col-span-3 form-group">
+                <label>Priorité</label>
+                <select aria-label="Niveau de priorité" value={form.priorite} onChange={e => set('priorite', e.target.value as any)} disabled={loading}>
+                  <option value="haute">🔴 Haute / Urgent</option>
+                  <option value="moyenne">🟡 Moyenne</option>
+                  <option value="faible">🟢 Faible</option>
+                </select>
+              </div>
+              
+              <div className="rh-section-header">CLIENT & CONTACT</div>
+              <div className="col-span-6 form-group">
                 <label>Entreprise *</label>
-                <select value={form.entreprise_id} onChange={e => set('entreprise_id', e.target.value)}>
+                <select aria-label="Sélectionner l'entreprise" value={form.entreprise_id} onChange={e => set('entreprise_id', e.target.value)} disabled={loading}>
                   <option value="">— Choisir —</option>
                   {entreprises.map(e => <option key={e.id} value={e.id}>{e.raison_sociale}</option>)}
                 </select>
               </div>
-              <div className="form-group">
+              <div className="col-span-3 form-group">
                 <label>Contact</label>
-                <select value={form.contact_id} onChange={e => set('contact_id', e.target.value)} disabled={!form.entreprise_id}>
+                <select aria-label="Sélectionner le contact" value={form.contact_id || ''} onChange={e => set('contact_id', e.target.value)} disabled={!form.entreprise_id || loading}>
                   <option value="">— Choisir —</option>
                   {contacts.map(c => <option key={c.id} value={c.id}>{c.prenom} {c.nom}</option>)}
                 </select>
               </div>
-              <div className="form-group">
+              <div className="col-span-3 form-group">
+                <label>Source Opportunité</label>
+                <input value={form.source_opportunite || ''} onChange={e => set('source_opportunite', e.target.value)} placeholder="LinkedIn, Phoning..." disabled={loading} />
+              </div>
+
+              <div className="rh-section-header">DÉTAILS PÉDAGOGIQUES</div>
+              <div className="col-span-3 form-group">
                 <label>Type d'opportunité</label>
-                <select value={form.type_opportunite} onChange={e => set('type_opportunite', e.target.value as TypeOpportunite)}>
+                <select aria-label="Type d'opportunité" value={form.type_opportunite} onChange={e => set('type_opportunite', e.target.value as TypeOpportunite)} disabled={loading}>
                   {Object.entries(TYPE_OPPORTUNITE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
-              <div style={{ gridColumn: '1/-1' }} className="form-group">
-                <label>Thème du programme</label>
-                <input value={form.theme_programme} onChange={e => set('theme_programme', e.target.value)}
-                  placeholder="Ex : Leadership et Management d'équipe" />
-              </div>
-              <div className="form-group">
+              <div className="col-span-3 form-group">
                 <label>Domaine de formation</label>
-                <select value={form.domaine_formation} onChange={e => set('domaine_formation', e.target.value)}>
+                <select aria-label="Domaine de formation" value={form.domaine_formation} onChange={e => set('domaine_formation', e.target.value)} disabled={loading}>
                   <option value="">— Choisir —</option>
                   {DOMAINES.map(d => <option key={d}>{d}</option>)}
                 </select>
               </div>
-              <div className="form-group">
-                <label>Étape pipeline</label>
-                <select value={form.etape_pipeline} onChange={e => set('etape_pipeline', e.target.value as EtapePipeline)}>
-                  {PIPELINE_STAGES.map(s => <option key={s} value={s}>{ETAPE_LABELS[s]}</option>)}
-                </select>
+              <div className="col-span-6 form-group">
+                <label>Thème du programme</label>
+                <input value={form.theme_programme} onChange={e => set('theme_programme', e.target.value)}
+                  placeholder="Ex : Leadership et Management d'équipe" disabled={loading} />
               </div>
-              <div style={{ gridColumn: '1/-1' }} className="form-group">
+              <div className="col-span-6 form-group">
                 <label>Besoin détaillé</label>
                 <textarea value={form.besoin_detaille} onChange={e => set('besoin_detaille', e.target.value)}
-                  rows={3} placeholder="Décrivez le besoin en formation..." />
+                  rows={2} placeholder="Décrivez le besoin..." disabled={loading} />
               </div>
-              <div className="form-group">
-                <label>Nombre de participants</label>
-                <input type="number" value={form.nombre_participants || ''} onChange={e => set('nombre_participants', parseInt(e.target.value) || 0)} />
+
+              <div className="rh-section-header">CORTÈGE FINANCIER & SUIVI</div>
+              <div className="col-span-3 form-group">
+                <label>Montant Estimé (DT)</label>
+                <input aria-label="Montant estimé" type="number" value={form.montant_estime || ''} onChange={e => set('montant_estime', parseInt(e.target.value) || 0)} disabled={loading} />
               </div>
-              <div className="form-group">
-                <label>Budget estimé (DT)</label>
-                <input type="number" value={form.budget_estime || ''} onChange={e => set('budget_estime', parseInt(e.target.value) || 0)} />
-              </div>
-              <div className="form-group">
-                <label>Montant estimé (DT)</label>
-                <input type="number" value={form.montant_estime || ''} onChange={e => set('montant_estime', parseInt(e.target.value) || 0)} />
-              </div>
-              <div className="form-group">
+              <div className="col-span-3 form-group">
                 <label>Probabilité (%)</label>
-                <input type="number" min="0" max="100" value={form.probabilite} onChange={e => set('probabilite', parseInt(e.target.value) || 0)} />
+                <input aria-label="Probabilité" type="number" min="0" max="100" value={form.probabilite} onChange={e => set('probabilite', parseInt(e.target.value) || 0)} disabled={loading} />
               </div>
-              <div className="form-group">
-                <label>Date prévue</label>
-                <input type="date" value={form.date_prevue} onChange={e => set('date_prevue', e.target.value)} />
+              <div className="col-span-3 form-group">
+                <label>Date Prévue</label>
+                <input aria-label="Date prévue" type="date" value={form.date_prevue} onChange={e => set('date_prevue', e.target.value)} disabled={loading} />
               </div>
-              <div className="form-group">
-                <label>Responsable commercial</label>
-                <input value={form.responsable_commercial} onChange={e => set('responsable_commercial', e.target.value)} placeholder="Prénom Nom" />
-              </div>
-              <div style={{ gridColumn: '1/-1' }} className="form-group">
-                <label>Prochaine action</label>
-                <input value={form.prochaine_action} onChange={e => set('prochaine_action', e.target.value)} placeholder="Ex : Envoyer la proposition" />
-              </div>
-              <div className="form-group">
-                <label>Date prochaine action</label>
-                <input type="date" value={form.date_prochaine_action} onChange={e => set('date_prochaine_action', e.target.value)} />
+              <div className="col-span-3 form-group">
+                <label>Échéance Dépôt</label>
+                <input aria-label="Date limite de dépôt" type="date" value={form.date_limite_depot || ''} onChange={e => set('date_limite_depot', e.target.value)} disabled={loading} />
               </div>
             </div>
           </div>
 
-          {/* Suggestions formateurs - col droite */}
-          <div style={{ width: '260px', borderLeft: '1px solid #f1f5f9', padding: '1.5rem', background: '#f8fafc', overflowY: 'auto', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <Lightbulb size={16} color="#d4af37" />
-              <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#1e293b' }}>Formateurs suggérés</span>
+          <div className="rh-sourcing-sidebar">
+            <div className="rh-sourcing-header">
+              <Lightbulb size={18} color="#d4af37" />
+              <span className="rh-sourcing-title">Sourcing Formateurs</span>
             </div>
             {suggestions.length === 0 ? (
-              <p style={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.6 }}>
+              <p className="rh-kpi-label rh-text-no-transform">
                 Renseignez le thème ou domaine pour voir les formateurs correspondants.
               </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="crm-suggest-list">
                 {suggestions.map(({ formateur, score }) => (
-                  <div key={formateur.id} style={{ background: 'white', borderRadius: '0.625rem', padding: '0.875rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#1e293b' }}>
+                  <div key={formateur.id} className="rh-kpi-card rh-bg-white rh-mb-md">
+                    <div className="rh-kpi-content rh-flex-1">
+                      <div className="rh-kpi-value rh-text-md rh-flex rh-items-center rh-gap-sm">
                         {formateur.prenom} {formateur.nom}
+                        {formateur.conformite_statut === 'conforme' && <Shield size={12} color="#10b981" />}
                       </div>
-                      <span style={{ background: '#d4af37', color: '#1e293b', borderRadius: '20px', padding: '0.1rem 0.45rem', fontSize: '0.7rem', fontWeight: 700 }}>
-                        {score}pt
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                      {formateur.domaines_couverts?.split(',').slice(0, 2).join(' · ')}
-                    </div>
-                    {formateur.mots_cles_formation && (
-                      <div style={{ marginTop: '0.4rem', fontSize: '0.7rem', color: '#94a3b8' }}>
-                        {formateur.mots_cles_formation?.split(',').slice(0, 3).join(', ')}
+                      <div className="rh-kpi-label rh-text-no-transform">
+                        {formateur.domaines_couverts?.split(',').slice(0, 2).join(' · ')}
                       </div>
-                    )}
+                    </div>
+                    <span className="crm-score-badge">{score}pt</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="rh-history-header">
+              <History size={18} color="#64748b" />
+              <span className="rh-history-title">Activités</span>
+            </div>
+            {historyLoading ? (
+               <p className="crm-history-loading">Chargement...</p>
+            ) : history.length === 0 ? (
+              <p className="crm-text-empty rh-text-sm">Aucun échange enregistré.</p>
+            ) : (
+              <div className="crm-history-mini-list">
+                {history.map(h => (
+                  <div key={h.id} className="crm-history-item-mini rh-border-bottom rh-mt-sm rh-py-sm">
+                    <div className="crm-history-meta-mini rh-text-silver rh-text-xs rh-flex rh-justify-between">
+                      <span>{TYPE_INTERACTION_LABELS[h.type_interaction]}</span>
+                      <span>{new Date(h.date_interaction).toLocaleDateString()}</span>
+                    </div>
+                    <div className="rh-kpi-value rh-text-sm rh-mt-xs">{h.objet}</div>
                   </div>
                 ))}
               </div>
@@ -206,10 +282,60 @@ const OppForm = ({ initial, onSave, onClose }: OppFormProps) => {
           </div>
         </div>
 
-        <div style={{ padding: '1rem 2rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexShrink: 0 }}>
-          <button className="btn btn-outline" onClick={onClose}>Annuler</button>
-          <button className="btn btn-primary" onClick={() => onSave(form)}>
-            <Save size={16} /> Enregistrer
+        <div className="rh-modal-footer">
+          <div className="rh-mr-auto">
+            {initial && form.etape_pipeline === 'gagnee' && (
+              <button 
+                className="btn btn-primary rh-success-bg" 
+                onClick={async () => {
+                   if (confirm('Transformer en mission opérationnelle ?')) {
+                     const bestTrainer = suggestions[0]?.formateur;
+                     await missionService.create({
+                        formateur_id: bestTrainer?.id || '',
+                        entreprise_id: form.entreprise_id,
+                        date_mission: form.date_prevue || new Date().toISOString().split('T')[0],
+                        theme_programme: form.theme_programme || 'Mission CRM',
+                        montant_mission: form.montant_estime || 0,
+                        paiement_statut: 'a_payer',
+                        statut_mission: 'planifiee'
+                     });
+                     toast.success('Mission créée avec succès ! Retrouvez-la dans le module formateur.');
+                   }
+                }}
+              >
+                🚀 Transformer en mission
+              </button>
+            )}
+            {initial && (form.etape_pipeline === 'qualification' || form.etape_pipeline === 'proposition') && (
+              <button 
+                className="btn btn-outline-warning"
+                onClick={async () => {
+                  const num = await devisService.generateQuoteNumber();
+                  const d = await devisService.create({
+                    numero_devis: num,
+                    entreprise_id: form.entreprise_id,
+                    opportunite_id: initial.id,
+                    objet: form.theme_programme || form.programme_demande || 'Sans titre',
+                    montant_ht: form.montant_estime || 0,
+                    tva_taux: 19,
+                    montant_ttc: (form.montant_estime || 0) * 1.19,
+                    date_emission: new Date().toISOString().split('T')[0],
+                    date_validite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    statut: 'brouillon'
+                  });
+                  if (d) {
+                    toast.success('Devis généré avec succès !');
+                    navigate('/crm/devis');
+                  }
+                }}
+              >
+                📄 Générer un devis
+              </button>
+            )}
+          </div>
+          <button className="btn btn-outline" onClick={onClose} disabled={loading}>Annuler</button>
+          <button className="btn btn-primary" onClick={() => onSave(form)} disabled={loading}>
+            <Save size={16} /> {loading ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </div>
       </motion.div>
@@ -223,76 +349,89 @@ const PROBA_DEFAULTS: Record<EtapePipeline, number> = {
   prospection: 10, qualification: 30, proposition: 60, negociation: 80, gagnee: 100, perdue: 0,
 };
 
-const PipelineView = ({ onEdit }: { onEdit: (o: Opportunite) => void }) => {
-  const [, forceUpdate] = useState(0);
-  const refresh = () => forceUpdate(n => n + 1);
-  const all = opportuniteService.getAll();
-  const entreprises = entrepriseService.getAll();
+interface PipelineViewProps {
+  opportunites: Opportunite[];
+  entreprises: Entreprise[];
+  onEdit: (o: Opportunite) => void;
+  onRefresh: () => void;
+}
+
+const PipelineView = ({ opportunites, entreprises, onEdit, onRefresh }: PipelineViewProps) => {
   const getEnt = (id: string) => entreprises.find(e => e.id === id)?.raison_sociale || '—';
 
-  const handleChangeEtape = (opp: Opportunite, etape: EtapePipeline) => {
-    opportuniteService.update(opp.id, {
+  const handleChangeEtape = async (opp: Opportunite, etape: EtapePipeline) => {
+    await opportuniteService.update(opp.id, {
       etape_pipeline: etape,
       probabilite: PROBA_DEFAULTS[etape],
       statut_opportunite: etape === 'gagnee' ? 'gagnee' : etape === 'perdue' ? 'perdue' : 'ouverte',
     });
-    refresh();
+    onRefresh();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Supprimer cette opportunité ?')) {
-      opportuniteService.delete(id);
-      refresh();
+      await opportuniteService.delete(id);
+      onRefresh();
     }
   };
 
   return (
-    <div style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
-      <div style={{ display: 'flex', gap: '0.875rem', minWidth: '900px' }}>
+    <div className="crm-pipeline-scroll">
+      <div className="crm-pipeline-columns">
         {PIPELINE_STAGES.map(stage => {
-          const cards = all.filter(o => o.etape_pipeline === stage);
-          const total = cards.reduce((s, o) => s + (o.montant_estime || 0), 0);
+          const cards = opportunites.filter(o => o.etape_pipeline === stage);
+          const totalValue = cards.reduce((s, o) => s + (o.montant_estime || 0), 0);
           const color = ETAPE_COLORS[stage];
           return (
-            <div key={stage} style={{ flex: '1', minWidth: '150px' }}>
-              {/* En-tête colonne */}
-              <div style={{ background: color, borderRadius: '0.625rem 0.625rem 0 0', padding: '0.75rem 1rem', marginBottom: '0.5rem' }}>
-                <div style={{ color: 'white', fontWeight: 700, fontSize: '0.85rem' }}>{ETAPE_LABELS[stage]}</div>
-                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem', marginTop: '0.15rem' }}>
-                  {cards.length} opp. • {total.toLocaleString()} DT
+            <div key={stage} className="crm-pipeline-col">
+              <div className={`crm-pipeline-col-head crm-bg-${stage}`}>
+                <div className="crm-pipeline-col-title">{ETAPE_LABELS[stage]}</div>
+                <div className="crm-pipeline-col-count">
+                  {cards.length} opp. • {totalValue.toLocaleString()} DT
                 </div>
               </div>
-              {/* Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: '80px' }}>
-                <AnimatePresence>
-                  {cards.map(o => (
-                    <motion.div key={o.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      style={{ background: 'white', borderRadius: '0.5rem', padding: '0.875rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: `1px solid ${color}22`, borderLeft: `3px solid ${color}` }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#1e293b', marginBottom: '0.25rem', lineHeight: 1.3 }}>{o.theme_programme || 'Sans titre'}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{getEnt(o.entreprise_id)}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.625rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>{(o.montant_estime || 0).toLocaleString()} DT</span>
-                        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{o.probabilite}%</span>
-                      </div>
-                      {/* Actions avancer/reculer */}
-                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        {PIPELINE_STAGES.filter(s => s !== stage).slice(0, 3).map(s => (
-                          <button key={s} onClick={() => handleChangeEtape(o, s)}
-                            style={{ fontSize: '0.65rem', padding: '0.2rem 0.45rem', borderRadius: '0.3rem', border: `1px solid ${ETAPE_COLORS[s]}44`, color: ETAPE_COLORS[s], background: `${ETAPE_COLORS[s]}11`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                            → {ETAPE_LABELS[s]}
-                          </button>
-                        ))}
-                        <button onClick={() => onEdit(o)}
-                          style={{ fontSize: '0.65rem', padding: '0.2rem 0.45rem', borderRadius: '0.3rem', border: '1px solid #e2e8f0', color: '#64748b', background: '#f8fafc', cursor: 'pointer' }}>
-                          <Edit2 size={10} />
-                        </button>
-                        <button onClick={() => handleDelete(o.id)}
-                          style={{ fontSize: '0.65rem', padding: '0.2rem 0.45rem', borderRadius: '0.3rem', border: '1px solid #fecaca', color: '#ef4444', background: '#fef2f2', cursor: 'pointer' }}>
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
+              <div className="crm-pipeline-cards">
+                <AnimatePresence mode="popLayout">
+                  {cards.map(o => {
+                    const isLate = o.date_prochaine_action && new Date(o.date_prochaine_action) < new Date();
+                    return (
+                      <motion.div key={o.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className={`crm-pipeline-card crm-border-${o.etape_pipeline} ${o.priorite === 'haute' ? 'crm-card-urgent' : ''}`}
+                      >
+                        <div className="crm-card-top">
+                          {o.programme_demande && <div className="crm-text-xs-muted">{o.programme_demande}</div>}
+                          <div className={`crm-priority-dot crm-priority-${o.priorite}`} title={`Priorité : ${o.priorite}`}></div>
+                        </div>
+                        <div className="crm-pipeline-card-title">{o.theme_programme || 'Sans titre'}</div>
+                        <div className="crm-pipeline-card-ent">{getEnt(o.entreprise_id)}</div>
+                        
+                        <div className="crm-pipeline-card-kpis">
+                          <span className="crm-pipeline-card-amount">{(o.montant_estime || 0).toLocaleString()} DT</span>
+                          <span className="crm-pipeline-card-proba">{o.probabilite}%</span>
+                        </div>
+
+                        {o.date_prochaine_action && (
+                          <div className={`crm-card-next-action ${isLate ? 'crm-text-danger' : ''}`}>
+                            <TrendingUp size={10} /> {o.date_prochaine_action}
+                          </div>
+                        )}
+
+                        <div className="crm-pipeline-card-actions">
+                          {PIPELINE_STAGES.filter(s => s !== stage).slice(0, 2).map(s => (
+                            <button key={s} onClick={() => handleChangeEtape(o, s)}
+                              className={`crm-pipeline-move-btn crm-move-${s}`}
+                              title={`Passer à : ${ETAPE_LABELS[s]}`}
+                              aria-label={`Passer à : ${ETAPE_LABELS[s]}`}
+                            >
+                              → {ETAPE_LABELS[s]}
+                            </button>
+                          ))}
+                            <button onClick={() => onEdit(o)} className="crm-pipeline-edit-btn" title="Détails" aria-label="Détails"><Edit2 size={10} /></button>
+                            <button onClick={() => handleDelete(o.id)} className="crm-pipeline-del-btn" title="Supprimer" aria-label="Supprimer"><Trash2 size={10} /></button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             </div>
@@ -312,64 +451,86 @@ const CrmOpportunites = () => {
   const [filterDomaine, setFilterDomaine] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Opportunite | null>(null);
-  const [, forceUpdate] = useState(0);
-  const refresh = () => forceUpdate(n => n + 1);
+  const [opportunites, setOpportunites] = useState<Opportunite[]>([]);
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [formLoading, setFormLoading] = useState(false);
 
-  const entreprises = entrepriseService.getAll();
-  const getEnt = (id: string) => entreprises.find(e => e.id === id)?.raison_sociale || '—';
-
-  const opportunites = useMemo(() =>
-    opportuniteService.search(search, {
-      etape: filterEtape || undefined,
-      domaine: filterDomaine || undefined,
-    }),
-    [search, filterEtape, filterDomaine, forceUpdate]
-  );
-
-  const stats = useMemo(() => {
-    const all = opportuniteService.getAll();
-    return {
-      total: all.length,
-      ouvertes: all.filter(o => o.statut_opportunite === 'ouverte').length,
-      montant: all.filter(o => o.statut_opportunite === 'ouverte').reduce((s, o) => s + (o.montant_estime || 0), 0),
-      gagnees: all.filter(o => o.statut_opportunite === 'gagnee').length,
-    };
-  }, [forceUpdate]);
-
-  const handleSave = (data: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editTarget) {
-      opportuniteService.update(editTarget.id, data);
-    } else {
-      opportuniteService.create(data);
-    }
-    setShowForm(false);
-    setEditTarget(null);
-    refresh();
+  const fetchData = async () => {
+    setLoading(true);
+    const [opps, ents] = await Promise.all([
+      opportuniteService.getAll(),
+      entrepriseService.getAll()
+    ]);
+    setOpportunites(opps);
+    setEntreprises(ents);
+    setLoading(false);
   };
 
-  const handleDelete = (id: string) => {
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const stats = useMemo(() => {
+    const totalCount = opportunites.length;
+    const gagneesCount = opportunites.filter(o => o.statut_opportunite === 'gagnee').length;
+    const transformationRate = totalCount > 0 ? (gagneesCount / totalCount) * 100 : 0;
+    
+    return {
+      total: totalCount,
+      ouvertes: opportunites.filter(o => o.statut_opportunite === 'ouverte').length,
+      montantBrut: opportunites.filter(o => o.statut_opportunite === 'ouverte').reduce((s, o) => s + (o.montant_estime || 0), 0),
+      montantPondere: opportunites.filter(o => o.statut_opportunite === 'ouverte').reduce((s, o) => s + ((o.montant_estime || 0) * (o.probabilite / 100)), 0),
+      gagnees: gagneesCount,
+      transformationRate: transformationRate.toFixed(1)
+    };
+  }, [opportunites]);
+
+  const filteredOpps = useMemo(() => {
+    return opportunites.filter(o => {
+      const matchQ = !search || o.theme_programme?.toLowerCase().includes(search.toLowerCase()) || o.domaine_formation?.toLowerCase().includes(search.toLowerCase());
+      const matchEtape = !filterEtape || o.etape_pipeline === filterEtape;
+      const matchDom = !filterDomaine || o.domaine_formation === filterDomaine;
+      return matchQ && matchEtape && matchDom;
+    });
+  }, [opportunites, search, filterEtape, filterDomaine]);
+
+  const getEnt = (id: string) => entreprises.find(e => e.id === id)?.raison_sociale || '—';
+
+  const handleSave = async (data: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>) => {
+    setFormLoading(true);
+    if (editTarget) {
+      await opportuniteService.update(editTarget.id, data);
+    } else {
+      await opportuniteService.create(data);
+    }
+    await fetchData();
+    setFormLoading(false);
+    setShowForm(false);
+    setEditTarget(null);
+  };
+
+  const handleDelete = async (id: string) => {
     if (confirm('Supprimer cette opportunité ?')) {
-      opportuniteService.delete(id);
-      refresh();
+      await opportuniteService.delete(id);
+      await fetchData();
     }
   };
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+    <div className="crm-container-1400">
+      <div className="crm-page-header">
         <div>
-          <h1 style={{ fontSize: '1.875rem', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <h1 className="crm-page-title">
             <Target size={28} color="#d4af37" /> Opportunités
           </h1>
-          <p style={{ color: '#64748b', marginTop: '0.25rem' }}>{stats.ouvertes} opportunité(s) ouvertes</p>
+          <p className="crm-page-subtitle">{loading ? 'Chargement...' : `${stats.ouvertes} opportunité(s) ouvertes`}</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          {/* Toggle vue */}
-          <div style={{ display: 'flex', background: 'white', borderRadius: '0.625rem', padding: '0.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div className="crm-header-actions">
+          <div className="crm-view-toggle">
             {(['pipeline', 'liste'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
-                style={{ padding: '0.5rem 1rem', borderRadius: '0.4rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', border: 'none', background: view === v ? '#1e293b' : 'transparent', color: view === v ? 'white' : '#64748b', transition: 'all 0.2s' }}>
+                className={view === v ? 'crm-toggle-btn crm-toggle-active' : 'crm-toggle-btn'}>
                 {v === 'pipeline' ? '⬛ Pipeline' : '☰ Liste'}
               </button>
             ))}
@@ -380,112 +541,101 @@ const CrmOpportunites = () => {
         </div>
       </div>
 
-      {/* Stats rapides */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="crm-stats-grid">
         {[
-          { label: 'Total', val: stats.total, color: '#6366f1', icon: <Target size={20} /> },
-          { label: 'Ouvertes', val: stats.ouvertes, color: '#3b82f6', icon: <TrendingUp size={20} /> },
-          { label: 'CA Potentiel', val: `${stats.montant.toLocaleString()} DT`, color: '#d4af37', icon: <TrendingUp size={20} /> },
-          { label: 'Gagnées', val: stats.gagnees, color: '#10b981', icon: <ChevronRight size={20} /> },
+          { label: 'Ouvertes', val: stats.ouvertes, colorName: 'blue', icon: <Target size={20} /> },
+          { label: 'CA Potentiel', val: `${stats.montantBrut.toLocaleString()} DT`, colorName: 'gold', icon: <TrendingUp size={20} /> },
+          { label: 'CA Pondéré', val: `${Math.round(stats.montantPondere).toLocaleString()} DT`, colorName: 'indigo', icon: <TrendingUp size={20} /> },
+          { label: 'Transformation', val: `${stats.transformationRate}%`, colorName: 'green', icon: <ChevronRight size={20} /> },
         ].map(s => (
-          <div key={s.label} style={{ background: 'white', borderRadius: '0.75rem', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '0.625rem', background: `${s.color}15`, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div key={s.label} className="crm-stat-card">
+            <div className={`crm-stat-icon crm-icon-${s.colorName}`}>
               {s.icon}
             </div>
             <div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{s.val}</div>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{s.label}</div>
+              <div className="crm-stat-value">{s.val}</div>
+              <div className="crm-stat-label">{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Filtres (vue liste) */}
       {view === 'liste' && (
-        <div style={{ background: 'white', borderRadius: '0.75rem', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ flex: '1 1 220px', position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Thème, domaine..." style={{ paddingLeft: '2.25rem' }} />
+        <div className="crm-filter-bar">
+          <div className="crm-search-wrapper">
+            <Search size={16} className="crm-search-icon" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Thème, domaine..." className="crm-search-input" />
           </div>
-          <select value={filterEtape} onChange={e => setFilterEtape(e.target.value)} style={{ flex: '0 1 180px' }}>
+          <select aria-label="Filtrer par étape" value={filterEtape} onChange={e => setFilterEtape(e.target.value)} className="crm-select-flex-180">
             <option value="">Toutes les étapes</option>
             {PIPELINE_STAGES.map(s => <option key={s} value={s}>{ETAPE_LABELS[s]}</option>)}
           </select>
-          <select value={filterDomaine} onChange={e => setFilterDomaine(e.target.value)} style={{ flex: '0 1 180px' }}>
+          <select aria-label="Filtrer par domaine" value={filterDomaine} onChange={e => setFilterDomaine(e.target.value)} className="crm-select-flex-180">
             <option value="">Tous les domaines</option>
             {DOMAINES.map(d => <option key={d}>{d}</option>)}
           </select>
         </div>
       )}
 
-      {/* Vue Pipeline ou Liste */}
-      {view === 'pipeline' ? (
-        <div style={{ background: 'white', borderRadius: '0.75rem', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <PipelineView onEdit={o => { setEditTarget(o); setShowForm(true); }} />
-        </div>
-      ) : (
-        <div style={{ background: 'white', borderRadius: '0.75rem', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                {['Thème / Programme', 'Entreprise', 'Domaine', 'Montant', 'Étape', 'Proba', 'Actions'].map(h => (
-                  <th key={h} style={{ padding: '1rem 1.25rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {opportunites.map((o, i) => {
-                const col = ETAPE_COLORS[o.etape_pipeline];
-                return (
-                  <motion.tr key={o.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
-                    style={{ borderBottom: '1px solid #f8fafc' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <td style={{ padding: '1rem 1.25rem' }}>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>{o.theme_programme || '—'}</div>
-                      <div style={{ fontSize: '0.775rem', color: '#94a3b8' }}>{TYPE_OPPORTUNITE_LABELS[o.type_opportunite]}</div>
-                    </td>
-                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.875rem', color: '#64748b' }}>{getEnt(o.entreprise_id)}</td>
-                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.875rem', color: '#64748b' }}>{o.domaine_formation || '—'}</td>
-                    <td style={{ padding: '1rem 1.25rem', fontWeight: 700, color: '#1e293b', fontSize: '0.875rem' }}>
-                      {(o.montant_estime || 0).toLocaleString()} DT
-                    </td>
-                    <td style={{ padding: '1rem 1.25rem' }}>
-                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: `${col}20`, color: col }}>
-                        {ETAPE_LABELS[o.etape_pipeline]}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.875rem', color: '#64748b' }}>{o.probabilite}%</td>
-                    <td style={{ padding: '1rem 1.25rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => { setEditTarget(o); setShowForm(true); }}
-                          style={{ padding: '0.4rem', borderRadius: '0.4rem', cursor: 'pointer', color: '#64748b', background: '#f8fafc', border: 'none' }}>
-                          <Edit2 size={15} />
-                        </button>
-                        <button onClick={() => handleDelete(o.id)}
-                          style={{ padding: '0.4rem', borderRadius: '0.4rem', cursor: 'pointer', color: '#ef4444', background: '#fef2f2', border: 'none' }}>
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-              {opportunites.length === 0 && (
-                <tr><td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Aucune opportunité trouvée</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {loading ? <div className="p-8 text-center text-muted">Chargement...</div> : (
+        view === 'pipeline' ? (
+          <div className="crm-pipeline-wrapper">
+            <PipelineView opportunites={opportunites} entreprises={entreprises} onEdit={o => { setEditTarget(o); setShowForm(true); }} onRefresh={fetchData} />
+          </div>
+        ) : (
+          <div className="crm-table-wrapper">
+            <table className="crm-table">
+              <thead>
+                <tr className="crm-table-head-row">
+                  {['Thème / Programme', 'Entreprise', 'Domaine', 'Montant', 'Étape', 'Proba', 'Actions'].map(h => (
+                    <th key={h} className="crm-th">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOpps.map((o, i) => {
+                  const col = ETAPE_COLORS[o.etape_pipeline];
+                  return (
+                    <motion.tr key={o.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
+                      className="crm-table-row">
+                      <td className="crm-td">
+                        <div className="crm-text-name">{o.theme_programme || '—'}</div>
+                        <div className="crm-text-xs-muted">{TYPE_OPPORTUNITE_LABELS[o.type_opportunite]}</div>
+                      </td>
+                      <td className="crm-td crm-td-text">{getEnt(o.entreprise_id)}</td>
+                      <td className="crm-td crm-td-text">{o.domaine_formation || '—'}</td>
+                      <td className="crm-td crm-td-bold">{(o.montant_estime || 0).toLocaleString()} DT</td>
+                      <td className="crm-td">
+                        <span className={`badge-statut statut-${o.etape_pipeline}`}>
+                          {ETAPE_LABELS[o.etape_pipeline]}
+                        </span>
+                      </td>
+                      <td className="crm-td crm-td-text">{o.probabilite}%</td>
+                      <td className="crm-td">
+                        <div className="crm-row-actions">
+                          <button onClick={() => { setEditTarget(o); setShowForm(true); }} className="crm-btn-icon-md" title="Modifier l'opportunité" aria-label="Modifier l'opportunité">
+                            <Edit2 size={15} />
+                          </button>
+                          <button onClick={() => handleDelete(o.id)} className="crm-btn-danger-md" title="Supprimer l'opportunité" aria-label="Supprimer l'opportunité">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
 
       {showForm && (
-        <OppForm initial={editTarget} onSave={handleSave} onClose={() => { setShowForm(false); setEditTarget(null); }} />
+        <OppForm initial={editTarget} onSave={handleSave} onClose={() => { setShowForm(false); setEditTarget(null); }} loading={formLoading} />
       )}
     </div>
   );
 };
 
-// export DOMAINES pour réutilisation
 export { DOMAINES };
 export default CrmOpportunites;

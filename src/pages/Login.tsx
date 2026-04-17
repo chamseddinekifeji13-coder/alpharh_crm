@@ -1,69 +1,115 @@
 import { useState } from 'react';
-import { ShieldCheck, Lock, Mail } from 'lucide-react';
-
-interface LoginProps {
-  onLogin: () => void;
-}
+import { ShieldCheck, Lock, Mail, AlertTriangle, Zap } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { supabase } from '../utils/supabaseClient';
+import { toast } from 'react-hot-toast';
 
 import '../App.css';
 
-const Login = ({ onLogin }: LoginProps) => {
+const Login = () => {
   const [email, setEmail] = useState('admin@alpharh.tn');
-  const [password, setPassword] = useState('password');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      toast.error('Échec de la connexion : ' + error.message);
+      setLoading(false);
+    } else {
+      toast.success('Connexion réussie !');
+    }
   };
 
   return (
     <div className="login-page">
-      <div className="login-card glass">
+      <motion.div 
+        className="login-card"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
         <div className="login-header">
-          <div className="brand-badge">α</div>
-          <h1>Alpha RH</h1>
-          <p>CVthèque Formateurs Tunisie</p>
+          <img src="/logo.png" alt="Alpha RH Logo" className="login-logo" />
+          <h2 className="crm-text-primary">Alpha RH CRM</h2>
+          <p className="crm-text-sm-muted">Système de gestion des talents et formations</p>
         </div>
 
+        {error && (
+          <motion.div 
+            className="login-error-badge"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <AlertTriangle size={16} />
+            <span>Identifiants incorrects</span>
+          </motion.div>
+        )}
+
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
+          <div className="login-form-group">
             <label htmlFor="login-email">Email professionnel</label>
-            <div className="input-with-icon">
-              <Mail size={18} />
+            <div className="login-input-wrapper">
               <input 
                 id="login-email" 
                 type="email" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
+                className="login-input-pill"
+                placeholder="nom@entreprise.tn"
                 required 
+                disabled={loading}
               />
+              <Mail className="login-input-icon" size={18} />
             </div>
           </div>
 
-          <div className="form-group">
+          <div className="login-form-group">
             <label htmlFor="login-password">Mot de passe</label>
-            <div className="input-with-icon">
-              <Lock size={18} />
+            <div className="login-input-wrapper">
               <input 
                 id="login-password" 
                 type="password" 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
+                className="login-input-pill"
+                placeholder="••••••••"
                 required 
+                disabled={loading}
               />
+              <Lock className="login-input-icon" size={18} />
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-block" title="Se connecter">
-            <ShieldCheck size={20} />
-            Se connecter
+          <button 
+            type="submit" 
+            className="btn btn-secondary btn-pill btn-block btn-lg mt-3" 
+            disabled={loading}
+          >
+            {loading ? 'Connexion en cours...' : (
+              <>
+                <ShieldCheck size={20} />
+                Se connecter
+              </>
+            )}
           </button>
         </form>
-
+        
         <p className="login-footer">
-          Système sécurisé pour Alpha RH
+          <Zap size={14} className="mr-1 inline" style={{ verticalAlign: 'middle' }} />
+          Accès sécurisé pour administrateurs Alpha RH
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 };

@@ -1,15 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2, Plus, Search, Filter, Eye, Edit2, Trash2,
-  X, Save, Globe, MapPin, Phone, Users, Tag, ChevronRight
+  X, Save, Globe, MapPin, Phone, Mail, Tag, TrendingUp, Target, Users,
+  History, ShoppingBag, Layout, Briefcase, CheckCircle2, FileText, Clock
 } from 'lucide-react';
 import {
-  Entreprise, StatutCompte, STATUT_COMPTE_LABELS
+  Entreprise, StatutCompte, STATUT_COMPTE_LABELS, Contact, Opportunite, Interaction, TYPE_INTERACTION_LABELS
 } from '../../types/crm.types';
-import { entrepriseService } from '../../utils/crmService';
-import { contactService } from '../../utils/crmService';
-import { opportuniteService } from '../../utils/crmService';
+import { entrepriseService, contactService, opportuniteService, interactionService } from '../../utils/crmService';
+import { missionService } from '../../utils/missionService';
+
+import '../../App.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,8 +38,8 @@ const SOURCES = [
 
 const emptyForm = (): Omit<Entreprise, 'id' | 'created_at' | 'updated_at'> => ({
   raison_sociale: '', secteur_activite: '', taille_entreprise: '',
-  adresse: '', ville: '', pays: 'Tunisie', site_web: '',
-  statut_compte: 'prospect', source_acquisition: '',
+  adresse: '', ville: '', pays: 'Tunisie', telephone: '', email: '',
+  site_web: '', statut_compte: 'prospect', source_acquisition: '',
   responsable_compte: '', remarques: '',
 });
 
@@ -47,14 +49,16 @@ interface EntrepriseFormProps {
   initial?: Entreprise | null;
   onSave: (data: Omit<Entreprise, 'id' | 'created_at' | 'updated_at'>) => void;
   onClose: () => void;
+  loading?: boolean;
 }
 
-const EntrepriseForm = ({ initial, onSave, onClose }: EntrepriseFormProps) => {
+const EntrepriseForm = ({ initial, onSave, onClose, loading }: EntrepriseFormProps) => {
   const [form, setForm] = useState(
     initial
       ? { raison_sociale: initial.raison_sociale, secteur_activite: initial.secteur_activite,
           taille_entreprise: initial.taille_entreprise, adresse: initial.adresse,
-          ville: initial.ville, pays: initial.pays, site_web: initial.site_web,
+          ville: initial.ville, pays: initial.pays, telephone: initial.telephone,
+          email: initial.email, site_web: initial.site_web,
           statut_compte: initial.statut_compte, source_acquisition: initial.source_acquisition,
           responsable_compte: initial.responsable_compte, remarques: initial.remarques }
       : emptyForm()
@@ -63,183 +67,351 @@ const EntrepriseForm = ({ initial, onSave, onClose }: EntrepriseFormProps) => {
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+    <div className="rh-modal-overlay">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        style={{ background: 'white', borderRadius: '1rem', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflow: 'auto' }}>
-        <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>
-            {initial ? 'Modifier l\'entreprise' : 'Nouvelle entreprise'}
-          </h2>
-          <button onClick={onClose} style={{ padding: '0.5rem', borderRadius: '0.5rem', cursor: 'pointer' }}><X size={20} /></button>
+        className="rh-modal-content md">
+        <div className="rh-modal-header">
+          <div className="rh-modal-header-info">
+            <div className="rh-modal-title-group">
+              <h2 className="rh-modal-title">
+                {initial ? 'Modifier l\'entreprise' : 'Nouvelle entreprise'}
+              </h2>
+              <span className="rh-modal-subtitle">Gestion du compte client / prospect</span>
+            </div>
+          </div>
+          <button onClick={onClose} title="Fermer" className="rh-modal-close"><X size={20} /></button>
         </div>
-        <div style={{ padding: '1.5rem 2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <div style={{ gridColumn: '1/-1' }} className="form-group">
-            <label>Raison sociale *</label>
-            <input value={form.raison_sociale} onChange={e => set('raison_sociale', e.target.value)} placeholder="Ex : Tunisie Télécom" />
-          </div>
-          <div className="form-group">
-            <label>Secteur d'activité</label>
-            <select value={form.secteur_activite} onChange={e => set('secteur_activite', e.target.value)}>
-              <option value="">— Choisir —</option>
-              {SECTEURS.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Taille de l'entreprise</label>
-            <select value={form.taille_entreprise} onChange={e => set('taille_entreprise', e.target.value)}>
-              <option value="">— Choisir —</option>
-              {TAILLES.map(t => <option key={t}>{t}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Statut du compte</label>
-            <select value={form.statut_compte} onChange={e => set('statut_compte', e.target.value as StatutCompte)}>
-              {Object.entries(STATUT_COMPTE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Source d'acquisition</label>
-            <select value={form.source_acquisition} onChange={e => set('source_acquisition', e.target.value)}>
-              <option value="">— Choisir —</option>
-              {SOURCES.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Ville</label>
-            <input value={form.ville} onChange={e => set('ville', e.target.value)} placeholder="Ex : Tunis" />
-          </div>
-          <div className="form-group">
-            <label>Pays</label>
-            <input value={form.pays} onChange={e => set('pays', e.target.value)} placeholder="Tunisie" />
-          </div>
-          <div style={{ gridColumn: '1/-1' }} className="form-group">
-            <label>Adresse</label>
-            <input value={form.adresse} onChange={e => set('adresse', e.target.value)} placeholder="Rue, quartier..." />
-          </div>
-          <div className="form-group">
-            <label>Site web</label>
-            <input value={form.site_web} onChange={e => set('site_web', e.target.value)} placeholder="www.exemple.tn" />
-          </div>
-          <div className="form-group">
-            <label>Responsable compte</label>
-            <input value={form.responsable_compte} onChange={e => set('responsable_compte', e.target.value)} placeholder="Prénom Nom" />
-          </div>
-          <div style={{ gridColumn: '1/-1' }} className="form-group">
-            <label>Remarques</label>
-            <textarea value={form.remarques} onChange={e => set('remarques', e.target.value)} rows={3} placeholder="Notes internes..." />
+        <div className="rh-modal-body">
+          <div className="rh-form-grid">
+            <div className="col-span-6 form-group">
+              <label>Raison sociale *</label>
+              <input value={form.raison_sociale} onChange={e => set('raison_sociale', e.target.value)} placeholder="Ex : Tunisie Télécom" disabled={loading} />
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Secteur d'activité</label>
+              <select title="Secteur d'activité" aria-label="Secteur d'activité" value={form.secteur_activite} onChange={e => set('secteur_activite', e.target.value)} disabled={loading}>
+                <option value="">— Choisir —</option>
+                {SECTEURS.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Taille de l'entreprise</label>
+              <select title="Taille de l'entreprise" aria-label="Taille de l'entreprise" value={form.taille_entreprise} onChange={e => set('taille_entreprise', e.target.value)} disabled={loading}>
+                <option value="">— Choisir —</option>
+                {TAILLES.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Statut du compte</label>
+              <select title="Statut du compte" aria-label="Statut du compte" value={form.statut_compte} onChange={e => set('statut_compte', e.target.value as StatutCompte)} disabled={loading}>
+                {Object.entries(STATUT_COMPTE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Source d'acquisition</label>
+              <select title="Source d'acquisition" aria-label="Source d'acquisition" value={form.source_acquisition} onChange={e => set('source_acquisition', e.target.value)} disabled={loading}>
+                <option value="">— Choisir —</option>
+                {SOURCES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            
+            <div className="rh-section-header">Coordonnées & Localisation</div>
+            
+            <div className="col-span-3 form-group">
+              <label>Ville</label>
+              <input value={form.ville} onChange={e => set('ville', e.target.value)} placeholder="Ex : Tunis" disabled={loading} />
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Pays</label>
+              <input value={form.pays} onChange={e => set('pays', e.target.value)} placeholder="Tunisie" disabled={loading} />
+            </div>
+            <div className="col-span-6 form-group">
+              <label>Adresse</label>
+              <input value={form.adresse} onChange={e => set('adresse', e.target.value)} placeholder="Rue, quartier..." disabled={loading} />
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Téléphone</label>
+              <input value={form.telephone} onChange={e => set('telephone', e.target.value)} placeholder="71 000 000" disabled={loading} />
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Email</label>
+              <input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="contact@entreprise.tn" disabled={loading} />
+            </div>
+            
+            <div className="rh-section-header">Administration</div>
+            
+            <div className="col-span-3 form-group">
+              <label>Site web</label>
+              <input value={form.site_web} onChange={e => set('site_web', e.target.value)} placeholder="www.exemple.tn" disabled={loading} />
+            </div>
+            <div className="col-span-3 form-group">
+              <label>Responsable compte</label>
+              <input value={form.responsable_compte} onChange={e => set('responsable_compte', e.target.value)} placeholder="Prénom Nom" disabled={loading} />
+            </div>
+            <div className="col-span-6 form-group">
+              <label>Remarques</label>
+              <textarea value={form.remarques} onChange={e => set('remarques', e.target.value)} rows={3} placeholder="Notes internes..." disabled={loading} />
+            </div>
           </div>
         </div>
-        <div style={{ padding: '1rem 2rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline" onClick={onClose}>Annuler</button>
-          <button className="btn btn-primary" onClick={() => onSave(form)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Save size={16} /> Enregistrer
+        <div className="rh-modal-footer">
+          <button className="btn btn-outline" onClick={onClose} disabled={loading}>Annuler</button>
+          <button className="btn btn-primary" onClick={() => onSave(form)} disabled={loading}>
+            <Save size={16} /> {loading ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </div>
       </motion.div>
     </div>
+
   );
 };
 
 // ─── Modal Fiche Entreprise ───────────────────────────────────────────────────
 
-const FicheEntreprise = ({ entreprise, onClose, onEdit }: { entreprise: Entreprise; onClose: () => void; onEdit: () => void }) => {
-  const contacts = contactService.getByEntreprise(entreprise.id);
-  const opportunites = opportuniteService.getByEntreprise(entreprise.id);
-  const statutStyle = STATUT_COLORS[entreprise.statut_compte];
+interface FicheEntrepriseProps {
+  entreprise: Entreprise;
+  onClose: () => void;
+  onEdit: () => void;
+}
+
+const FicheEntreprise = ({ entreprise, onClose, onEdit }: FicheEntrepriseProps) => {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [opportunites, setOpportunites] = useState<Opportunite[]>([]);
+  const [missions, setMissions] = useState<any[]>([]);
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'ops' | 'contacts'>('overview');
+
+  useEffect(() => {
+    const fetchLinkData = async () => {
+      setLoading(true);
+      const [cData, oData, mData, iData] = await Promise.all([
+        contactService.getByEntreprise(entreprise.id),
+        opportuniteService.getByEntreprise(entreprise.id),
+        missionService.getByEntreprise(entreprise.id),
+        interactionService.getByEntreprise(entreprise.id)
+      ]);
+      setContacts(cData);
+      setOpportunites(oData);
+      setMissions(mData);
+      setInteractions(iData);
+      setLoading(false);
+    };
+    fetchLinkData();
+  }, [entreprise.id]);
+
+  const totalRevenue = missions.reduce((sum, m) => sum + (m.montant_mission || 0), 0);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+    <div className="rh-modal-overlay">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        style={{ background: 'white', borderRadius: '1rem', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
-        {/* Header */}
-        <div style={{ padding: '1.5rem 2rem', background: '#1e293b', borderRadius: '1rem 1rem 0 0', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#d4af37', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.25rem' }}>Fiche Entreprise</div>
-            <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{entreprise.raison_sociale}</h2>
-            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#94a3b8' }}>
-              <span>{entreprise.secteur_activite}</span>
-              <span>•</span>
-              <span>{entreprise.ville}</span>
+        className="rh-modal-content xl" style={{ padding: 0 }}>
+        
+        {/* En-tête de la fiche */}
+        <div className="rh-modal-header rh-modal-header-dark">
+          <div className="rh-modal-header-info">
+            <div className="crm-avatar rh-avatar-xl">
+              {entreprise.raison_sociale.substring(0, 2).toUpperCase()}
+            </div>
+            <div className="rh-modal-title-group">
+              <h2 className="rh-modal-title rh-modal-title-light">{entreprise.raison_sociale}</h2>
+              <div className="rh-modal-subtitle rh-modal-subtitle-light">
+                <MapPin size={16} /> 
+                {entreprise.adresse || entreprise.ville || 'Tunisie'}
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={onEdit} style={{ padding: '0.5rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}><Edit2 size={18} /></button>
-            <button onClick={onClose} style={{ padding: '0.5rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}><X size={18} /></button>
+          <div className="rh-fiche-actions-top">
+            <button className="crm-fiche-btn" onClick={() => onEdit()} title="Modifier"><Edit2 size={20} /></button>
+            <button className="crm-fiche-btn" onClick={onClose} title="Fermer"><X size={20} /></button>
           </div>
         </div>
-        <div style={{ padding: '1.5rem 2rem' }}>
-          {/* Statut + infos */}
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-            <span style={{ padding: '0.35rem 0.875rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, background: statutStyle.bg, color: statutStyle.color }}>
-              {STATUT_COMPTE_LABELS[entreprise.statut_compte]}
-            </span>
-            <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{entreprise.taille_entreprise}</span>
-            {entreprise.responsable_compte && (
-              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>👤 {entreprise.responsable_compte}</span>
-            )}
-          </div>
 
-          {/* Infos détaillées */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            {[
-              { icon: <MapPin size={14} />, label: 'Adresse', val: `${entreprise.adresse}, ${entreprise.ville}` },
-              { icon: <Globe size={14} />, label: 'Site web', val: entreprise.site_web || '—' },
-              { icon: <Tag size={14} />, label: 'Source', val: entreprise.source_acquisition || '—' },
-              { icon: <Phone size={14} />, label: 'Pays', val: entreprise.pays },
-            ].map(it => (
-              <div key={it.label} style={{ padding: '0.875rem', background: '#f8fafc', borderRadius: '0.5rem' }}>
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-                  {it.icon} {it.label}
+        {/* Navigation par onglets */}
+        <div className="rh-fiche-tab-nav">
+          {[
+            { id: 'overview', label: 'Aperçu', icon: <Layout size={16} /> },
+            { id: 'sales', label: 'Ventes', icon: <ShoppingBag size={16} /> },
+            { id: 'ops', label: 'Missions', icon: <History size={16} /> },
+            { id: 'contacts', label: 'Contacts', icon: <Users size={16} /> },
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              className={`rh-fiche-tab-btn ${activeTab === tab.id ? 'active' : ''}`} 
+              onClick={() => setActiveTab(tab.id as any)}
+            >
+              <span className="rh-section-header-title">{tab.icon} {tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rh-modal-body rh-modal-body-premium">
+          {activeTab === 'overview' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              {/* KPIs Rapides */}
+              <div className="rh-kpi-grid">
+                <div className="rh-kpi-card">
+                  <div className="rh-kpi-icon rh-kpi-icon-success"><Layout size={18} /></div>
+                  <div className="rh-kpi-content">
+                    <span className="rh-kpi-value">{totalRevenue.toLocaleString()} DT</span>
+                    <span className="rh-kpi-label">CA Total Facturé</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 500 }}>{it.val}</div>
+                <div className="rh-kpi-card">
+                  <div className="rh-kpi-icon rh-kpi-icon-primary"><Briefcase size={18} /></div>
+                  <div className="rh-kpi-content">
+                    <span className="rh-kpi-value">{opportunites.length}</span>
+                    <span className="rh-kpi-label">Opportunités</span>
+                  </div>
+                </div>
+                <div className="rh-kpi-card">
+                  <div className="rh-kpi-icon rh-kpi-icon-purple"><CheckCircle2 size={18} /></div>
+                  <div className="rh-kpi-content">
+                    <span className="rh-kpi-value rh-text-capitalize">{entreprise.statut_compte}</span>
+                    <span className="rh-kpi-label">Statut du Compte</span>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Remarques */}
-          {entreprise.remarques && (
-            <div style={{ padding: '1rem', background: '#fffbeb', borderLeft: '4px solid #d4af37', borderRadius: '0 0.5rem 0.5rem 0', marginBottom: '1.5rem', fontSize: '0.875rem', color: '#78350f', lineHeight: 1.6 }}>
-              {entreprise.remarques}
-            </div>
-          )}
-
-          {/* Contacts liés */}
-          <h3 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '0.75rem' }}>Contacts ({contacts.length})</h3>
-          {contacts.length === 0 ? (
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Aucun contact enregistré.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              {contacts.map(c => (
-                <div key={c.id} style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>{c.prenom} {c.nom}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{c.fonction} • {c.email}</div>
+              <div className="rh-form-grid rh-mt-md">
+                <div className="col-span-4">
+                  <h3 className="rh-section-header rh-section-header-title"><FileText size={18} /> Profil & Remarques</h3>
+                  <div className="crm-remarques-box">
+                    {entreprise.remarques || "Aucune remarque particulière pour cette entreprise."}
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{c.role_decisionnel}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Opportunités liées */}
-          <h3 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '0.75rem' }}>Opportunités ({opportunites.length})</h3>
-          {opportunites.length === 0 ? (
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Aucune opportunité enregistrée.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {opportunites.map(o => (
-                <div key={o.id} style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>{o.theme_programme}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{o.domaine_formation} • {o.nombre_participants} participants</div>
+                  
+                  <div className="rh-section-header rh-mt-lg">
+                    <History size={16} /> Timeline d'activités
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>{o.montant_estime?.toLocaleString()} DT</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{o.etape_pipeline}</div>
+                  <div className="rh-mt-md">
+                    {interactions.length === 0 ? (
+                      <p className="crm-text-empty">Aucune interaction enregistrée.</p>
+                    ) : (
+                      <div className="crm-history-mini-list">
+                        {interactions.slice(0, 3).map(h => (
+                          <div key={h.id} className="crm-history-item-mini rh-p-sm rh-border-bottom">
+                            <div className="crm-history-meta-mini rh-text-silver rh-text-xs rh-flex rh-justify-between">
+                              <span>{TYPE_INTERACTION_LABELS[h.type_interaction]}</span>
+                              <span>{new Date(h.date_interaction).toLocaleDateString()}</span>
+                            </div>
+                            <div className="crm-history-objet-mini rh-font-semibold rh-mt-sm">{h.objet}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="col-span-2">
+                  <h3 className="rh-section-header rh-section-header-title"><Clock size={16} /> Informations</h3>
+                  <div className="rh-kpi-card rh-kpi-card-mini">
+                    <div className="rh-kpi-content rh-kpi-content-compact">
+                      <span className="rh-kpi-label">Secteur</span>
+                      <span className="rh-kpi-value rh-text-sm">{entreprise.secteur_activite || '—'}</span>
+                    </div>
+                  </div>
+                  <div className="rh-kpi-card rh-kpi-card-mini">
+                    <div className="rh-kpi-content rh-kpi-content-compact">
+                      <span className="rh-kpi-label">Taille</span>
+                      <span className="rh-kpi-value rh-text-sm">{entreprise.taille_entreprise || '—'}</span>
+                    </div>
+                  </div>
+                  <div className="rh-kpi-card rh-kpi-card-mini">
+                    <div className="rh-kpi-content rh-kpi-content-compact">
+                      <span className="rh-kpi-label">Source</span>
+                      <span className="rh-kpi-value rh-text-sm">{entreprise.source_acquisition || '—'}</span>
+                    </div>
+                  </div>
+                  <div className="rh-kpi-card rh-kpi-card-mini">
+                    <div className="rh-kpi-content rh-kpi-content-compact">
+                      <span className="rh-kpi-label">Responsable</span>
+                      <span className="rh-kpi-value rh-text-sm">{entreprise.responsable_compte || '—'}</span>
+                    </div>
+                  </div>
+                  <div className="rh-kpi-card rh-kpi-card-mini">
+                    <div className="rh-kpi-content rh-kpi-content-compact">
+                      <span className="rh-kpi-label">Identifiant Fiscal</span>
+                      <span className="rh-kpi-value rh-text-sm">{entreprise.identifiant_fiscal || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'sales' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="rh-section-header">
+                <ShoppingBag size={16} /> Opportunités Commerciales
+              </div>
+              {opportunites.length === 0 ? (
+                <p className="crm-text-empty rh-mt-md">Aucune opportunité récente.</p>
+              ) : (
+                <div className="crm-linked-list rh-mt-md">
+                  {opportunites.map(o => (
+                    <div key={o.id} className="crm-linked-item-modern">
+                      <div className="item-main">
+                        <div className="item-title">{o.theme_programme}</div>
+                        <div className="item-sub">{o.domaine_formation} • {o.nombre_participants} pers.</div>
+                      </div>
+                      <div className="item-side">
+                        <div className="item-amount">{o.montant_estime?.toLocaleString()} DT</div>
+                        <div className={`crm-status-bubble bubble-${o.etape_pipeline}`}>{o.etape_pipeline}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'ops' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="rh-section-header">
+                <History size={16} /> Historique des Missions
+              </div>
+              {missions.length === 0 ? (
+                <p className="crm-text-empty rh-mt-md">Aucune mission réalisée.</p>
+              ) : (
+                <div className="crm-linked-list rh-mt-md">
+                  {missions.map(m => (
+                    <div key={m.id} className="crm-linked-item-modern">
+                      <div className="item-main">
+                        <div className="item-title">{m.theme_programme}</div>
+                        <div className="item-sub">{new Date(m.date_mission).toLocaleDateString()} • Formateur : {m.formateur_nom || 'Non assigné'}</div>
+                      </div>
+                      <div className="item-side">
+                        <div className="item-amount">{m.montant_mission?.toLocaleString()} DT</div>
+                        <div className="crm-status-bubble bubble-done">{m.paiement_statut === 'paye' ? 'Facturé/Payé' : 'À régler'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'contacts' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="rh-section-header">
+                <Users size={16} /> Interlocuteurs
+              </div>
+              {contacts.length === 0 ? (
+                <p className="crm-text-empty rh-mt-md">Aucun contact enregistré.</p>
+              ) : (
+                <div className="rh-form-grid rh-mt-md">
+                  {contacts.map(c => (
+                    <div key={c.id} className="col-span-3 crm-contact-card-fiche rh-p-md rh-bg-light rh-rounded-md">
+                      <div className="contact-name rh-font-bold">{c.prenom} {c.nom}</div>
+                      <div className="contact-role rh-text-sm rh-text-muted">{c.fonction}</div>
+                      <div className="contact-info rh-mt-sm rh-flex rh-flex-col rh-gap-xs">
+                        <span className="rh-text-md rh-flex rh-items-center rh-gap-sm"><Mail size={12} /> {c.email}</span>
+                        <span className="rh-text-md rh-flex rh-items-center rh-gap-sm"><Phone size={12} /> {c.telephone}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
           )}
         </div>
       </motion.div>
@@ -257,127 +429,163 @@ const CrmEntreprises = () => {
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Entreprise | null>(null);
   const [ficheTarget, setFicheTarget] = useState<Entreprise | null>(null);
-  const [, forceUpdate] = useState(0);
-  const refresh = () => forceUpdate(n => n + 1);
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
+  const [stats, setStats] = useState({ total: 0, clients: 0, prospects: 0, caTotal: 0 });
+  const [loading, setLoading] = useState(true);
+  const [formLoading, setFormLoading] = useState(false);
 
-  const entreprises = useMemo(() =>
-    entrepriseService.search(search, {
-      secteur: filterSecteur || undefined,
-      statut: filterStatut || undefined,
-      ville: filterVille || undefined,
-    }),
-    [search, filterSecteur, filterStatut, filterVille, forceUpdate]
-  );
-
-  const villes = useMemo(() =>
-    [...new Set(entrepriseService.getAll().map(e => e.ville).filter(Boolean))],
-    []
-  );
-
-  const handleSave = (data: Omit<Entreprise, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editTarget) {
-      entrepriseService.update(editTarget.id, data);
-    } else {
-      entrepriseService.create(data);
-    }
-    setShowForm(false);
-    setEditTarget(null);
-    refresh();
+  const fetchData = async () => {
+    setLoading(true);
+    const [data, sData] = await Promise.all([
+      entrepriseService.search(search, {
+        secteur: filterSecteur || undefined,
+        statut: filterStatut || undefined,
+        ville: filterVille || undefined,
+      }),
+      entrepriseService.getGlobalStats()
+    ]);
+    setEntreprises(data);
+    setStats(sData);
+    setLoading(false);
   };
 
-  const handleDelete = (id: string) => {
+  useEffect(() => {
+    const timer = setTimeout(fetchData, 300);
+    return () => clearTimeout(timer);
+  }, [search, filterSecteur, filterStatut, filterVille]);
+
+  const villes = useMemo(() =>
+    [...new Set(entreprises.map(e => e.ville).filter(Boolean))],
+    [entreprises]
+  );
+
+  const handleSave = async (data: Omit<Entreprise, 'id' | 'created_at' | 'updated_at'>) => {
+    setFormLoading(true);
+    if (editTarget) {
+      const success = await entrepriseService.update(editTarget.id, data);
+      if (success) {
+        setEntreprises(prev => prev.map(e => e.id === editTarget.id ? { ...e, ...data, updated_at: new Date().toISOString() } : e));
+      }
+    } else {
+      const record = await entrepriseService.create(data);
+      if (record) {
+        setEntreprises(prev => [record, ...prev]);
+      }
+    }
+    setFormLoading(false);
+    setShowForm(false);
+    setEditTarget(null);
+  };
+
+  const handleDelete = async (id: string) => {
     if (confirm('Supprimer cette entreprise ?')) {
-      entrepriseService.delete(id);
-      refresh();
+      const success = await entrepriseService.delete(id);
+      if (success) {
+        setEntreprises(prev => prev.filter(e => e.id !== id));
+      }
     }
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+    <div className="crm-container-1200">
+      <div className="crm-page-header-lg">
         <div>
-          <h1 style={{ fontSize: '1.875rem', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Building2 size={28} color="#d4af37" /> Entreprises
+          <h1 className="crm-page-title">
+            <Building2 size={28} color="#d4af37" /> Entreprises & Clients
           </h1>
-          <p style={{ color: '#64748b', marginTop: '0.25rem' }}>{entreprises.length} entreprise(s) trouvée(s)</p>
+          <p className="crm-page-subtitle">Gestion stratégique des comptes et prospection</p>
         </div>
         <button className="btn btn-primary" onClick={() => { setEditTarget(null); setShowForm(true); }}>
           <Plus size={18} /> Nouvelle entreprise
         </button>
       </div>
 
-      {/* Filtres */}
-      <div style={{ background: 'white', borderRadius: '0.75rem', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <div style={{ flex: '1 1 220px', position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+      <div className="crm-stats-grid">
+        {[
+          { label: 'Total Entreprises', val: stats.total, colorName: 'indigo', icon: <Building2 size={20} /> },
+          { label: 'Clients Actifs', val: stats.clients, colorName: 'green', icon: <Target size={20} /> },
+          { label: 'Prospects', val: stats.prospects, colorName: 'blue', icon: <TrendingUp size={20} /> },
+          { label: 'CA Total Billed', val: `${stats.caTotal.toLocaleString()} DT`, colorName: 'gold', icon: <TrendingUp size={20} /> },
+        ].map(s => (
+          <div key={s.label} className="crm-stat-card">
+            <div className={`crm-stat-icon crm-icon-${s.colorName}`}>
+              {s.icon}
+            </div>
+            <div>
+              <div className="crm-stat-value">{s.val}</div>
+              <div className="crm-stat-label">{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="crm-filter-bar">
+        <div className="crm-search-wrapper">
+          <Search size={16} className="crm-search-icon" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher une entreprise..." style={{ paddingLeft: '2.25rem' }} />
+            placeholder="Rechercher une entreprise..." className="crm-search-input" />
         </div>
-        <select value={filterSecteur} onChange={e => setFilterSecteur(e.target.value)} style={{ flex: '1 1 160px' }}>
+        <select title="Filtrer par secteur" aria-label="Filtrer par secteur" value={filterSecteur} onChange={e => setFilterSecteur(e.target.value)} className="crm-select-flex-160">
           <option value="">Tous les secteurs</option>
           {SECTEURS.map(s => <option key={s}>{s}</option>)}
         </select>
-        <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={{ flex: '1 1 140px' }}>
+        <select title="Filtrer par statut" aria-label="Filtrer par statut" value={filterStatut} onChange={e => setFilterStatut(e.target.value)} className="crm-select-flex-140">
           <option value="">Tous les statuts</option>
           {Object.entries(STATUT_COMPTE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <select value={filterVille} onChange={e => setFilterVille(e.target.value)} style={{ flex: '1 1 140px' }}>
+        <select title="Filtrer par ville" aria-label="Filtrer par ville" value={filterVille} onChange={e => setFilterVille(e.target.value)} className="crm-select-flex-140">
           <option value="">Toutes les villes</option>
           {villes.map(v => <option key={v}>{v}</option>)}
         </select>
         {(search || filterSecteur || filterStatut || filterVille) && (
           <button onClick={() => { setSearch(''); setFilterSecteur(''); setFilterStatut(''); setFilterVille(''); }}
-            style={{ padding: '0.5rem 0.875rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+            className="crm-btn-clear">
             <X size={14} /> Effacer
           </button>
         )}
       </div>
 
-      {/* Table */}
-      <div style={{ background: 'white', borderRadius: '0.75rem', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="crm-table-wrapper">
+        <table className="crm-table">
           <thead>
-            <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+            <tr className="crm-table-head-row">
               {['Entreprise', 'Secteur', 'Ville', 'Statut', 'Responsable', 'Actions'].map(h => (
-                <th key={h} style={{ padding: '1rem 1.25rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                <th key={h} className="crm-th">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            <AnimatePresence>
+            <AnimatePresence mode="popLayout">
               {entreprises.map((e, i) => {
-                const s = STATUT_COLORS[e.statut_compte];
+                const s = STATUT_COLORS[e.statut_compte] || STATUT_COLORS.prospect;
                 return (
                   <motion.tr key={e.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     transition={{ delay: i * 0.04 }}
-                    style={{ borderBottom: '1px solid #f8fafc' }}
-                    onMouseEnter={ev => (ev.currentTarget.style.background = '#f8fafc')}
-                    onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
-                    <td style={{ padding: '1rem 1.25rem' }}>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>{e.raison_sociale}</div>
-                      <div style={{ fontSize: '0.775rem', color: '#94a3b8' }}>{e.taille_entreprise}</div>
+                    className="crm-table-row">
+                    <td className="crm-td">
+                      <div className="crm-text-name">{e.raison_sociale}</div>
+                      <div className="crm-text-xs-muted">{e.taille_entreprise}</div>
                     </td>
-                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.875rem', color: '#64748b' }}>{e.secteur_activite || '—'}</td>
-                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.875rem', color: '#64748b' }}>{e.ville || '—'}</td>
-                    <td style={{ padding: '1rem 1.25rem' }}>
-                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: s.bg, color: s.color }}>
+                    <td className="crm-td crm-td-text">{e.secteur_activite || '—'}</td>
+                    <td className="crm-td crm-td-text">{e.ville || '—'}</td>
+                    <td className="crm-td">
+                      <span className={`crm-tag-pill crm-statut-${e.statut_compte}`}>
                         {STATUT_COMPTE_LABELS[e.statut_compte]}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem 1.25rem', fontSize: '0.875rem', color: '#64748b' }}>{e.responsable_compte || '—'}</td>
-                    <td style={{ padding: '1rem 1.25rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <td className="crm-td crm-td-text">{e.responsable_compte || '—'}</td>
+                    <td className="crm-td">
+                      <div className="crm-row-actions">
                         <button onClick={() => setFicheTarget(e)} title="Voir la fiche"
-                          style={{ padding: '0.4rem', borderRadius: '0.4rem', cursor: 'pointer', color: '#3b82f6', background: '#eff6ff', border: 'none' }}>
+                          className="crm-btn-icon-blue">
                           <Eye size={15} />
                         </button>
                         <button onClick={() => { setEditTarget(e); setShowForm(true); }} title="Modifier"
-                          style={{ padding: '0.4rem', borderRadius: '0.4rem', cursor: 'pointer', color: '#64748b', background: '#f8fafc', border: 'none' }}>
+                          className="crm-btn-icon-md">
                           <Edit2 size={15} />
                         </button>
                         <button onClick={() => handleDelete(e.id)} title="Supprimer"
-                          style={{ padding: '0.4rem', borderRadius: '0.4rem', cursor: 'pointer', color: '#ef4444', background: '#fef2f2', border: 'none' }}>
+                          className="crm-btn-danger-md">
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -386,24 +594,27 @@ const CrmEntreprises = () => {
                 );
               })}
             </AnimatePresence>
-            {entreprises.length === 0 && (
+            {!loading && entreprises.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                  <Building2 size={40} style={{ margin: '0 auto 0.75rem', display: 'block', opacity: 0.3 }} />
+                <td colSpan={6} className="crm-table-empty">
+                  <Building2 size={40} className="crm-empty-icon" />
                   Aucune entreprise trouvée
                 </td>
               </tr>
+            )}
+            {loading && (
+              <tr><td colSpan={6} className="crm-table-empty">Chargement...</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Modals */}
       {showForm && (
         <EntrepriseForm
           initial={editTarget}
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditTarget(null); }}
+          loading={formLoading}
         />
       )}
       {ficheTarget && (

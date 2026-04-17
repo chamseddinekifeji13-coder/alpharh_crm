@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   FileCheck, 
   FileSignature, 
-  TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Building2,
+  Target,
+  UserCircle2,
+  BadgeEuro
 } from 'lucide-react';
 import { 
   Chart as ChartJS, 
@@ -20,6 +23,9 @@ import {
 import { Pie, Bar } from 'react-chartjs-2';
 import { motion } from 'framer-motion';
 import { dbService } from '../utils/dbService';
+import { entrepriseService, contactService, opportuniteService } from '../utils/crmService';
+import { Formateur } from '../types/trainer.types';
+import { Entreprise, Contact, Opportunite } from '../types/crm.types';
 
 import '../App.css';
 
@@ -35,7 +41,32 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
-  const trainers = dbService.getAll();
+  const [trainers, setTrainers] = useState<Formateur[]>([]);
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [opportunites, setOpportunites] = useState<Opportunite[]>([]);
+  const [montantTotal, setMontantTotal] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const [tData, eData, cData, oData, mTotal] = await Promise.all([
+        dbService.getAll(),
+        entrepriseService.getAll(),
+        contactService.getAll(),
+        opportuniteService.getAll(),
+        opportuniteService.getMontantTotal()
+      ]);
+      setTrainers(tData);
+      setEntreprises(eData);
+      setContacts(cData);
+      setOpportunites(oData);
+      setMontantTotal(mTotal);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   const stats = useMemo(() => {
     const total = trainers.length;
@@ -52,13 +83,27 @@ const Dashboard = () => {
     ];
   }, [trainers]);
 
+  const crmStats = useMemo(() => {
+    const oppOuvertes = opportunites.filter(o => o.statut_opportunite === 'ouverte').length;
+
+    return [
+      { label: 'Entreprises', value: entreprises.length.toString(), icon: Building2, color: 'indigo' },
+      { label: 'Contacts CRM', value: contacts.length.toString(), icon: UserCircle2, color: 'purple' },
+      { label: 'Opportunités', value: oppOuvertes.toString(), icon: Target, color: 'orange' },
+      { label: 'Pipeline (DT)', value: montantTotal.toLocaleString(), icon: BadgeEuro, color: 'emerald' },
+    ];
+  }, [entreprises, contacts, opportunites, montantTotal]);
+
   const domainData = useMemo(() => {
     const counts: Record<string, number> = {};
     trainers.forEach(t => {
-      t.experiences_formation.forEach(exp => {
-        const d = exp.domaine_formation || 'Autre';
-        counts[d] = (counts[d] || 0) + 1;
-      });
+      // Logic for domain data from experiences_formation if available
+      if (t.domaines_couverts) {
+        t.domaines_couverts.split(',').forEach(d => {
+          const trimmed = d.trim();
+          if (trimmed) counts[trimmed] = (counts[trimmed] || 0) + 1;
+        });
+      }
     });
 
     const sortedLabels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 5);
@@ -100,11 +145,15 @@ const Dashboard = () => {
     };
   }, [trainers]);
 
+  if (loading) {
+    return <div className="p-8 text-center">Chargement des données...</div>;
+  }
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
         <h1>Alpha RH - Tableau de Bord</h1>
-        <p>Aperçu en temps réel de votre CVthèque de formateurs</p>
+        <p>Aperçu en temps réel de votre CVthèque et CRM (Supabase)</p>
       </header>
 
       <div className="stats-grid">
@@ -118,6 +167,31 @@ const Dashboard = () => {
             transition={{ delay: index * 0.1 }}
           >
             <div className="stat-icon">
+              <stat.icon size={24} />
+            </div>
+            <div className="stat-info">
+              <h3>{stat.value}</h3>
+              <p>{stat.label}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <header className="dashboard-header mt-2">
+        <h2>Aperçu CRM Commercial</h2>
+      </header>
+
+      <div className="stats-grid">
+        {crmStats.map((stat, index) => (
+          <motion.div 
+            key={index}
+            className="stat-card glass"
+            data-color={stat.color}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 + 0.3 }}
+          >
+            <div className="stat-icon focus">
               <stat.icon size={24} />
             </div>
             <div className="stat-info">
@@ -169,13 +243,14 @@ const Dashboard = () => {
       <div className="recent-activity glass mt-2">
         <h3>Derniers Profils Ajoutés</h3>
         <div className="activity-list">
-          {trainers.slice(0, 5).map((t, i) => (
+          {trainers.slice(0, 5).map((t) => (
             <div key={t.id} className="activity-item">
               <div className="dot"></div>
               <span><strong>{t.nom} {t.prenom}</strong> a été ajouté ({t.extraction_statut})</span>
               <span className="time">{new Date(t.created_at).toLocaleDateString()}</span>
             </div>
           ))}
+          {trainers.length === 0 && <p className="crm-text-sm-muted">Aucun formateur enregistré pour le moment.</p>}
         </div>
       </div>
     </div>
