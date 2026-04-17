@@ -22,13 +22,14 @@ export const devisService = {
       .from('devis')
       .select(`
         *,
-        entreprise:entreprises(raison_sociale),
-        opportunite:opportunites(theme_programme)
+        entreprise:entreprises(*),
+        opportunite:opportunites(theme_programme),
+        items:devis_items(*)
       `)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erreur chargement devis:', error);
+      console.error('Erreur chargement devis:', error.message);
       return [];
     }
 
@@ -41,8 +42,9 @@ export const devisService = {
       .from('devis')
       .select(`
         *,
-        entreprise:entreprises(raison_sociale),
-        opportunite:opportunites(theme_programme)
+        entreprise:entreprises(*),
+        opportunite:opportunites(theme_programme),
+        items:devis_items(*)
       `)
       .eq('id', id)
       .single();
@@ -54,25 +56,49 @@ export const devisService = {
     return data;
   },
 
-  // Créer un devis
+  // Créer un devis avec ses items
   create: async (data: Omit<Devis, 'id' | 'created_at' | 'updated_at'>): Promise<Devis | null> => {
-    const sanitized = sanitizeData(data);
+    const { items, ...devisData } = data as any;
+    const sanitized = sanitizeData(devisData);
+    
+    // 1. Créer le devis parent
     const { data: record, error } = await supabase
       .from('devis')
       .insert({ ...sanitized, updated_at: now() })
       .select()
       .single();
 
-    if (error) {
+    if (error || !record) {
       console.error('Erreur création devis:', error);
       return null;
     }
+
+    // 2. Créer les items si présents
+    if (items && items.length > 0) {
+      const itemsToInsert = items.map((item: any) => ({
+        ...sanitizeData(item),
+        devis_id: record.id,
+        id: undefined // On laisse Supabase générer les UUID
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('devis_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) {
+        console.error('Erreur création items devis:', itemsError);
+      }
+    }
+
     return record;
   },
 
-  // Mettre à jour un devis
+  // Mettre à jour un devis et ses items
   update: async (id: string, data: Partial<Devis>): Promise<boolean> => {
-    const sanitized = sanitizeData(data);
+    const { items, ...devisData } = data as any;
+    const sanitized = sanitizeData(devisData);
+    
+    // 1. Mettre à jour le devis parent
     const { error } = await supabase
       .from('devis')
       .update({ ...sanitized, updated_at: now() })
@@ -82,6 +108,23 @@ export const devisService = {
       console.error('Erreur mise à jour devis:', error);
       return false;
     }
+
+    // 2. Synchroniser les items (Plus simple : delete & re-insert)
+    if (items) {
+      // Supprimer les anciens
+      await supabase.from('devis_items').delete().eq('devis_id', id);
+
+      // Insérer les nouveaux
+      if (items.length > 0) {
+        const itemsToInsert = items.map((item: any) => ({
+          ...sanitizeData(item),
+          devis_id: id,
+          id: undefined
+        }));
+        await supabase.from('devis_items').insert(itemsToInsert);
+      }
+    }
+
     return true;
   },
 

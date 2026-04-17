@@ -11,6 +11,8 @@ import {
   MessageSquare,
   UserCircle2,
   FileText,
+  X,
+  Menu
 } from 'lucide-react';
 
 import '../App.css';
@@ -19,19 +21,32 @@ import { useConfig } from '../context/ConfigContext';
 
 interface SidebarProps {
   onLogout?: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-const Sidebar = ({ onLogout }: SidebarProps) => {
+const Sidebar = ({ onLogout, isOpen, onClose }: SidebarProps) => {
   const { config } = useConfig();
 
   return (
-    <aside className="sidebar dark-glass">
+    <aside className={`sidebar dark-glass ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
-        <img 
-          src={config?.company_logo_url || '/logo.png'} 
-          alt="Company Logo" 
-          className="sidebar-logo" 
-        />
+        <div className="sidebar-header-top">
+          <img 
+            src={config?.company_logo_url || '/logo.png'} 
+            alt="Company Logo" 
+            className="sidebar-logo" 
+          />
+          {/* Mobile Close Button */}
+          <button 
+            className="sidebar-close-mobile" 
+            onClick={onClose}
+            title="Fermer le menu"
+            aria-label="Fermer le menu"
+          >
+            <X size={24} />
+          </button>
+        </div>
         <div className="sidebar-brand">
           <h2>{config?.company_name || 'Alpha RH'}</h2>
           <span className="sidebar-badge">CRM Cloud</span>

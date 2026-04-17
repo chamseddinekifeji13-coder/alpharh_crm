@@ -17,12 +17,14 @@ import Settings from './pages/Settings';
 import { useState, useEffect } from 'react';
 import { supabase } from './utils/supabaseClient';
 import { Session } from '@supabase/supabase-js';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ConfigProvider } from './context/ConfigContext';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }: any) => {
@@ -52,8 +54,36 @@ function App() {
     }
     return (
       <div className="app-container">
-        <Sidebar onLogout={handleLogout} />
-        <main className="main-content">
+        {/* Mobile Toggle Button */}
+        <button 
+          className="mobile-menu-toggle" 
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open Menu"
+        >
+          <div className="hamburger-box">
+             <div className="hamburger-inner"></div>
+          </div>
+        </button>
+
+        {/* Global Overlay for Mobile Sidebar */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="sidebar-overlay"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <Sidebar 
+          onLogout={handleLogout} 
+          isOpen={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)} 
+        />
+        <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
           {children}
         </main>
       </div>

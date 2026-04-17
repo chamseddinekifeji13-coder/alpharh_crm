@@ -1,0 +1,9 @@
+# Ignorer les dossiers de template v0/Shadcn qui polluent le build
+components/ui
+src/components/ui
+node_modules
+.next
+.vercel
+dist
+*.pdf
+README.txt

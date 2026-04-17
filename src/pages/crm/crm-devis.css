@@ -204,6 +204,22 @@
   align-items: center;
 }
 
+.crm-devis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .crm-devis-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .modal-header h2 {
   font-size: 1.5rem;
   font-weight: 700;
@@ -359,6 +375,8 @@
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2);
+  z-index: 10;
+  position: relative;
 }
 
 .btn-primary:hover {
@@ -381,4 +399,209 @@
   background: #e2e8f0 !important;
   color: #94a3b8 !important;
   cursor: not-allowed;
+}
+
+/* ─── RESPONSIVE DEVIS ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .crm-devis-page {
+    padding: 1.5rem;
+  }
+  
+  .stats-row {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-bar.no-glass {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .modern-table-container {
+    overflow-x: auto;
+  }
+
+  .modern-table th, 
+  .modern-table td {
+    padding: 1rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .form-grid.modern-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col-span-2, .col-span-3, .col-span-4, .col-span-6 {
+    grid-column: span 1;
+  }
+
+  .modal-content.large {
+    border-radius: 0;
+    max-height: 100vh;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ─── MULTI-ITEMS EDITOR ───────────────────────────────────────────────── */
+.multi-items-container {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.items-header-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 140px 140px 50px;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.item-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 140px 140px 50px;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  align-items: center;
+  transition: background 0.2s;
+}
+
+.item-row:hover {
+  background: white;
+}
+
+.item-row textarea, .item-row input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+  background: white;
+  transition: all 0.2s;
+}
+
+.item-row textarea:focus, .item-row input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.col-total {
+  font-weight: 700;
+  color: #1e293b;
+  text-align: right;
+  padding-right: 0.5rem;
+}
+
+.col-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.del-item-btn {
+  background: #fee2e2;
+  color: #ef4444;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.del-item-btn:hover {
+  background: #ef4444;
+  color: white;
+  transform: scale(1.1);
+}
+
+.add-item-btn {
+  width: 100%;
+  padding: 1rem;
+  background: white;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-item-btn:hover {
+  background: #f0f7ff;
+  color: #2563eb;
+}
+
+.items-section-header {
+  margin-bottom: 1rem !important;
+}
+
+.calc-value-container.highlight {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.calc-value-container.highlight .calc-label {
+  color: #059669;
+}
+
+.calc-value-container.highlight .calc-price {
+  color: #065f46;
+}
+
+@media (max-width: 640px) {
+  .items-header-row {
+    display: none;
+  }
+  
+  .item-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 1.5rem 1rem;
+    position: relative;
+  }
+  
+  .col-qty, .col-price, .col-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .col-qty::before { content: "Quantité:"; font-weight: 600; font-size: 0.8rem; }
+  .col-price::before { content: "Prix HT:"; font-weight: 600; font-size: 0.8rem; }
+  .col-total::before { content: "Total HT:"; font-weight: 600; font-size: 0.8rem; }
+  
+  .col-total { text-align: left; padding: 0.5rem; background: #f8fafc; border-radius: 0.5rem; }
+  
+  .del-item-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+  }
 }

@@ -186,6 +186,17 @@ export const STATUT_VALIDATION_LABELS: Record<StatutValidationOpp, string> = {
 
 export type StatutDevis = 'brouillon' | 'envoye' | 'accepte' | 'refuse' | 'expire';
 
+export interface DevisItem {
+  id: string;
+  devis_id: string;
+  description: string;
+  quantite: number;
+  prix_unitaire_ht: number;
+  tva_taux: number;
+  montant_ht: number;
+  montant_ttc: number;
+}
+
 export interface Devis {
   id: string;
   numero_devis: string;
@@ -203,8 +214,16 @@ export interface Devis {
   created_at: string;
   updated_at: string;
   // Join data
-  entreprise?: { raison_sociale: string };
+  entreprise?: { 
+    raison_sociale: string;
+    adresse?: string;
+    ville?: string;
+    identifiant_fiscal?: string;
+    email?: string;
+    telephone?: string;
+  };
   opportunite?: { theme_programme: string };
+  items?: DevisItem[];
 }
 
 export const STATUT_DEVIS_LABELS: Record<StatutDevis, string> = {

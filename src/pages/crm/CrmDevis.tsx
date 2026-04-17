@@ -15,13 +15,22 @@ import {
   CreditCard,
   Trash2,
   Edit2,
-  XCircle
+  XCircle,
+  X,
+  PlusCircle,
+  Package,
+  Send,
+  History,
+  Check,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { devisService } from '../../utils/devisService';
-import { entrepriseService, opportuniteService } from '../../utils/crmService';
-import { Devis, STATUT_DEVIS_LABELS, STATUT_DEVIS_COLORS, StatutDevis, Entreprise, Opportunite } from '../../types/crm.types';
+import { entrepriseService, opportuniteService, interactionService } from '../../utils/crmService';
+import { Devis, STATUT_DEVIS_LABELS, STATUT_DEVIS_COLORS, StatutDevis, Entreprise, Opportunite, DevisItem, Interaction } from '../../types/crm.types';
 import { toast } from 'react-hot-toast';
+import { useConfig } from '../../context/ConfigContext';
+import { generateDevisPDF } from '../../utils/pdfGenerator';
 
 import '../../App.css';
 import './crm-devis.css'; // New styles
@@ -51,6 +60,22 @@ const CrmDevis = () => {
     remarques_internes: ''
   });
 
+  const [items, setItems] = useState<Partial<DevisItem>[]>([
+    { description: '', quantite: 1, prix_unitaire_ht: 0, tva_taux: 19 }
+  ]);
+
+  const { config } = useConfig();
+
+  // Email Modal State
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailTarget, setEmailTarget] = useState<Devis | null>(null);
+  const [emailForm, setEmailForm] = useState({
+    to: '',
+    subject: '',
+    message: ''
+  });
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   const resetForm = () => {
     setNewDevis({
       numero_devis: '',
@@ -64,6 +89,7 @@ const CrmDevis = () => {
       statut: 'brouillon' as StatutDevis,
       remarques_internes: ''
     });
+    setItems([{ description: '', quantite: 1, prix_unitaire_ht: 0, tva_taux: 19 }]);
     setEditTarget(null);
   };
 
@@ -105,12 +131,37 @@ const CrmDevis = () => {
         statut: target.statut,
         remarques_internes: target.remarques_internes || ''
       });
+      setItems(target.items && target.items.length > 0 
+        ? target.items 
+        : [{ description: '', quantite: 1, prix_unitaire_ht: 0, tva_taux: 19 }]
+      );
     } else {
       resetForm();
       const nextNum = await devisService.generateQuoteNumber();
       setNewDevis(prev => ({ ...prev, numero_devis: nextNum }));
     }
     setShowForm(true);
+  };
+
+  // Calculation logic for Multi-Items
+  useEffect(() => {
+    const totalHT = items.reduce((acc, item) => acc + ((item.prix_unitaire_ht || 0) * (item.quantite || 0)), 0);
+    setNewDevis(prev => ({ ...prev, montant_ht: totalHT }));
+  }, [items]);
+
+  const addItem = () => {
+    setItems([...items, { description: '', quantite: 1, prix_unitaire_ht: 0, tva_taux: 19 }]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length === 1) return;
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof DevisItem, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
   };
 
   const handleSaveDevis = async () => {
@@ -123,14 +174,13 @@ const CrmDevis = () => {
     const tvaTaux = parseFloat(newDevis.tva_taux as any) || 19;
 
     setSubmitting(true);
-    // On prépare l'objet sans les champs de join (entreprise, opportunite)
     const payload = {
       ...newDevis,
-      montant_ht: montantHT,
-      tva_taux: tvaTaux,
-      montant_ttc: montantHT * (1 + tvaTaux / 100),
-      // On s'assure que les IDs vides passent à null
-      opportunite_id: newDevis.opportunite_id || null
+      montant_ht: newDevis.montant_ht,
+      tva_taux: 19, // TVA par défaut
+      montant_ttc: newDevis.montant_ht * 1.19,
+      opportunite_id: newDevis.opportunite_id || null,
+      items: items.filter(i => i.description) // On n'envoie que les items remplis
     };
 
     let result;
@@ -175,12 +225,65 @@ const CrmDevis = () => {
     }
   };
 
-  const handleDownload = (d: Devis) => {
-    toast.loading(`Génération du PDF pour ${d.numero_devis}...`, { duration: 2000 });
-    setTimeout(() => {
-      toast.success('Le PDF a été généré avec succès !');
-      // On pourrait ici déclencher window.print() ou ouvrir un blob
-    }, 2000);
+  const handleDownload = async (d: Devis) => {
+    const loadingToast = toast.loading(`Génération du PDF pour ${d.numero_devis}...`);
+    try {
+      await generateDevisPDF(d, config);
+      toast.success('Le PDF a été généré avec succès !', { id: loadingToast });
+    } catch (error) {
+      console.error('PDF Error:', error);
+      toast.error('Erreur lors de la génération du PDF', { id: loadingToast });
+    }
+  };
+
+  const handleOpenEmailModal = (d: Devis) => {
+    setEmailTarget(d);
+    setEmailForm({
+      to: d.entreprise?.email || '',
+      subject: `Devis ${d.numero_devis} - ${d.objet}`,
+      message: `Bonjour,\n\nVeuillez trouver ci-joint notre proposition commerciale concernant ${d.objet}.\n\nCordialement.`
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailTarget) return;
+    setSendingEmail(true);
+    try {
+      // 1. Simuler l'envoi
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // 2. Logger l'interaction
+      const interactionData: any = {
+        entreprise_id: emailTarget.entreprise_id,
+        type_interaction: 'email',
+        objet: `Envoi Devis ${emailTarget.numero_devis}`,
+        compte_rendu: `Devis envoyé par email : ${emailForm.subject}\n\nMessage :\n${emailForm.message}`,
+        date_interaction: new Date().toISOString(),
+        utilisateur: 'Admin Alpha RH',
+        prochaine_relance: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        statut_relance: 'a_faire'
+      };
+
+      // Ne passer l'opportunité que si elle existe
+      if (emailTarget.opportunite_id) {
+        interactionData.opportunite_id = emailTarget.opportunite_id;
+      }
+
+      await interactionService.create(interactionData);
+
+      // 3. Mettre à jour le statut du devis
+      await updateStatut(emailTarget.id, 'envoye');
+      
+      toast.success('Email envoyé et historisé avec succès !');
+      setShowEmailModal(false);
+      loadData();
+    } catch (e) {
+      console.error(e);
+      toast.error('Erreur lors de l\'envoi');
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const filteredDevis = devis.filter(d => 
@@ -299,7 +402,7 @@ const CrmDevis = () => {
                     <div className="action-group">
                       <button className="icon-btn-sm" title="Télécharger PDF" onClick={() => handleDownload(d)}><Download size={16} /></button>
                       <button className="icon-btn-sm primary" title="Modifier" onClick={() => handleOpenForm(d)}><Edit2 size={16} /></button>
-                      <button className="icon-btn-sm" title="Envoyer par email" onClick={() => updateStatut(d.id, 'envoye')}><Mail size={16} /></button>
+                      <button className="icon-btn-sm" title="Envoyer par email" onClick={() => handleOpenEmailModal(d)}><Mail size={16} /></button>
                       <button className="icon-btn-sm text-green" title="Accepter" onClick={() => updateStatut(d.id, 'accepte')}><CheckCircle2 size={16} /></button>
                       <button className="icon-btn-sm text-orange" title="Refuser" onClick={() => updateStatut(d.id, 'refuse')}><XCircle size={16} /></button>
                       <button className="icon-btn-sm text-danger" title="Supprimer" onClick={() => handleDelete(d.id)}><Trash2 size={16} /></button>
@@ -413,33 +516,104 @@ const CrmDevis = () => {
                   </div>
                 </div>
 
+                {/* ── Section Articles (Multi-items) ── */}
+                <div className="rh-section-header items-section-header">
+                  <Package size={16} /> Détail des Articles (Multi-lignes)
+                </div>
+                
+                <div className="multi-items-container">
+                  <div className="items-header-row">
+                    <div className="col-desc">Désignation / Article</div>
+                    <div className="col-qty">Qté</div>
+                    <div className="col-price">P.U (HT)</div>
+                    <div className="col-total">Total (HT)</div>
+                    <div className="col-actions"></div>
+                  </div>
+                  
+                  {items.map((item, idx) => (
+                    <div key={idx} className="item-row">
+                      <div className="col-desc">
+                        <textarea 
+                          placeholder="Désignation de la prestation..."
+                          rows={1}
+                          value={item.description}
+                          onChange={e => updateItem(idx, 'description', e.target.value)}
+                          title="Désignation de l'article"
+                          aria-label="Désignation de l'article"
+                        />
+                      </div>
+                      <div className="col-qty">
+                        <input 
+                          type="number"
+                          min="1"
+                          value={item.quantite}
+                          onChange={e => updateItem(idx, 'quantite', parseFloat(e.target.value) || 0)}
+                          title="Quantité"
+                          aria-label="Quantité"
+                        />
+                      </div>
+                      <div className="col-price">
+                        <input 
+                          type="number"
+                          placeholder="0.00"
+                          value={item.prix_unitaire_ht}
+                          onChange={e => updateItem(idx, 'prix_unitaire_ht', parseFloat(e.target.value) || 0)}
+                          title="Prix Unitaire HT"
+                          aria-label="Prix Unitaire HT"
+                        />
+                      </div>
+                      <div className="col-total">
+                        {((item.prix_unitaire_ht || 0) * (item.quantite || 0)).toLocaleString()} TND
+                      </div>
+                      <div className="col-actions">
+                        <button className="del-item-btn" onClick={() => removeItem(idx)} title="Supprimer la ligne">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <button className="add-item-btn" onClick={addItem}>
+                    <PlusCircle size={14} /> Ajouter un article
+                  </button>
+                </div>
+
                 {/* ── Section Financière ── */}
                 <div className="rh-section-header">
-                  <CreditCard size={16} /> Conditions Financières
+                  <CreditCard size={16} /> Récapitulatif Financier
                 </div>
                 <div className="rh-form-grid">
                   <div className="form-group col-span-2">
-                    <label htmlFor="edit-ht">Montant HT (TND)</label>
+                    <label>Montant Global HT</label>
                     <div className="rh-input-wrapper">
                       <TrendingUp size={18} />
                       <input 
-                        id="edit-ht"
-                        type="number" 
-                        value={newDevis.montant_ht}
-                        onChange={e => setNewDevis({...newDevis, montant_ht: parseFloat(e.target.value) || 0})}
+                        type="text" 
+                        value={`${newDevis.montant_ht.toLocaleString()} TND`}
+                        disabled 
+                        className="input-disabled font-bold"
+                        title="Montant Global HT cumulative"
+                        aria-label="Montant Global HT cumulative"
                       />
                     </div>
                   </div>
                   <div className="form-group col-span-2">
-                    <label htmlFor="edit-tva">TVA (%)</label>
+                    <label>TVA (19%)</label>
                     <div className="rh-input-wrapper">
                       <CheckCircle2 size={18} />
-                      <input id="edit-tva" type="number" value={newDevis.tva_taux} disabled className="input-disabled" />
+                      <input 
+                        type="text" 
+                        value="Auto-calculée" 
+                        disabled 
+                        className="input-disabled" 
+                        title="TVA auto-calculée"
+                        aria-label="TVA auto-calculée"
+                      />
                     </div>
                   </div>
                   <div className="form-group col-span-2">
                     <label>Total TTC Estimé</label>
-                    <div className="calc-value-container">
+                    <div className="calc-value-container highlight">
                       <span className="calc-label">Total Incl. TVA</span>
                       <span className="calc-price">{(newDevis.montant_ht * 1.19).toLocaleString()} TND</span>
                     </div>
@@ -470,6 +644,90 @@ const CrmDevis = () => {
                 <button className="btn btn-outline" onClick={() => setShowForm(false)}>Annuler</button>
                 <button className="btn btn-primary" onClick={handleSaveDevis} disabled={submitting}>
                   {submitting ? 'Traitement en cours...' : (editTarget ? 'Mettre à jour' : 'Générer le Devis')}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modal Envoi Email ── */}
+      <AnimatePresence>
+        {showEmailModal && (
+          <div className="modal-overlay">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="modal-content medium"
+            >
+              <div className="modal-header">
+                <h2>Envoyer le Devis par Email</h2>
+                <button 
+                  className="close-btn" 
+                  onClick={() => setShowEmailModal(false)}
+                  title="Fermer"
+                  aria-label="Fermer le modal d'envoi d'email"
+                >
+                  <X />
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group mb-4">
+                  <label>Destinataire</label>
+                  <div className="rh-input-wrapper">
+                    <Mail size={18} />
+                    <input 
+                      id="email-to"
+                      type="email" 
+                      value={emailForm.to} 
+                      onChange={e => setEmailForm({...emailForm, to: e.target.value})}
+                      placeholder="email@client.com"
+                    />
+                  </div>
+                </div>
+                <div className="form-group mb-4">
+                  <label>Objet</label>
+                  <div className="rh-input-wrapper">
+                    <FileText size={18} />
+                    <input 
+                      id="email-subject"
+                      type="text" 
+                      value={emailForm.subject} 
+                      onChange={e => setEmailForm({...emailForm, subject: e.target.value})}
+                      placeholder="Sujet de l'email"
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Message</label>
+                  <textarea 
+                    id="email-body"
+                    rows={8}
+                    value={emailForm.message}
+                    onChange={e => setEmailForm({...emailForm, message: e.target.value})}
+                    className="rh-textarea"
+                    placeholder="Écrivez votre message ici..."
+                  />
+                </div>
+                
+                <div className="info-alert mt-4">
+                  <Info size={16} />
+                  <p>L'envoi mettra à jour le statut du devis en <strong>"Envoyé"</strong> et l'ajoutera à l'historique client.</p>
+                </div>
+              </div>
+              <div className="rh-modal-footer">
+                <button className="btn btn-outline" onClick={() => setShowEmailModal(false)}>Annuler</button>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={handleSendEmail} 
+                  disabled={sendingEmail}
+                >
+                  {sendingEmail ? 'Envoi...' : (
+                    <>
+                      <Send size={18} /> Confirmer l'envoi
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
