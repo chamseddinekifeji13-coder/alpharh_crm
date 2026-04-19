@@ -504,7 +504,7 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
         <div className="bg-slate-50 rounded-3xl p-8 border border-slate-100 h-fit">
            <h3 className="font-medium text-slate-900 mb-4">Analyse de Rentabilité</h3>
            <p className="text-sm text-slate-600 mb-6 font-light">Le point mort est calculé sur la base du CA collecté. Actuellement votre rentabilité brute est de :</p>
-           <div className="text-4xl font-medium" style={{ color: margin >= 0 ? '#10b981' : '#ef4444' }}>
+           <div className={`text-4xl font-medium ${margin >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
              {((margin / (revenue || 1)) * 100).toFixed(1)}%
            </div>
            <p className="text-xs text-slate-400 mt-2">Marge calculée hors taxes et hors commissions variables supplémentaires.</p>
@@ -527,7 +527,7 @@ const KPIBox = ({ label, value, color, icon: Icon }: any) => (
   </div>
 );
 
-const DollarSignIcon = ({ size }: { size: number }) => <span className="font-bold text-xl" style={{ fontSize: size * 0.8 }}>$</span>;
+const DollarSignIcon = () => <span className="font-bold text-xl">$</span>;
 
 const DocumentsManager = ({ session, participants, config }: any) => {
   return (

@@ -120,6 +120,15 @@ a {
   box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 12px rgba(165, 36, 235, 0.25);
 }
 
+.logo-dynamic-size {
+  height: var(--logo-size);
+  width: var(--logo-size);
+}
+
+.logo-dynamic-height {
+  height: var(--logo-size);
+}
+
 /* --- Responsive Navigation Controls --- */
 .mobile-menu-toggle {
   display: none;

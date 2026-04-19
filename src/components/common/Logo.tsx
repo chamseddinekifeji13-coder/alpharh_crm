@@ -13,22 +13,21 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
   const customLogo = config?.company_logo_url;
 
   return (
-    <div className={`logo-main-wrapper ${className}`} style={{ maxHeight: size }}>
+    <div className={`logo-main-wrapper ${className}`} style={{ "--logo-size": `${size}px` } as any}>
       {/* Premium Logo Container */}
       <motion.div 
         whileHover={{ scale: 1.05, rotate: 2 }}
         whileTap={{ scale: 0.95 }}
-        className="logo-inner-container"
+        className="logo-inner-container logo-dynamic-size"
         style={{ 
-          height: size, 
-          width: customLogo ? 'auto' : size,
+          width: customLogo ? 'auto' : 'var(--logo-size)',
           maxWidth: size * 4,
-          minWidth: customLogo ? '60px' : size
-        }}
+          minWidth: customLogo ? '60px' : 'var(--logo-size)'
+        } as any}
       >
         {customLogo ? (
           /* Render uploaded company logo with flexible width but STRICT height */
-          <div className="logo-custom-img-wrapper" style={{ height: size }}>
+          <div className="logo-custom-img-wrapper logo-dynamic-height">
             <img 
               src={customLogo} 
               alt="Logo" 
