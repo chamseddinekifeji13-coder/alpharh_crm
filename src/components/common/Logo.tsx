@@ -5,25 +5,21 @@ import { useConfig } from '../../context/ConfigContext';
 interface LogoProps {
   className?: string;
   size?: number;
+  sizeClassName?: 'logo-size-sidebar' | 'logo-size-login' | 'logo-size-default' | 'logo-size-small';
   withText?: boolean;
 }
 
-const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false }) => {
+const Logo: React.FC<LogoProps> = ({ className = '', size = 40, sizeClassName = 'logo-size-default', withText = false }) => {
   const { config } = useConfig();
   const customLogo = config?.company_logo_url;
 
   return (
-    <div className={`logo-main-wrapper ${className}`} style={{ "--logo-size": `${size}px` } as any}>
+    <div className={`logo-main-wrapper ${className} ${sizeClassName}`}>
       {/* Premium Logo Container */}
       <motion.div 
         whileHover={{ scale: 1.05, rotate: 2 }}
         whileTap={{ scale: 0.95 }}
         className="logo-inner-container logo-dynamic-size"
-        style={{ 
-          width: customLogo ? 'auto' : 'var(--logo-size)',
-          maxWidth: size * 4,
-          minWidth: customLogo ? '60px' : 'var(--logo-size)'
-        } as any}
       >
         {customLogo ? (
           /* Render uploaded company logo with flexible width but STRICT height */
@@ -43,8 +39,8 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
 
             {/* Abstract Alpha SVG Symbol */}
             <svg 
-              width={size * 0.65} 
-              height={size * 0.65} 
+              width="65%" 
+              height="65%" 
               viewBox="0 0 24 24" 
               fill="none" 
               xmlns="http://www.w3.org/2000/svg"

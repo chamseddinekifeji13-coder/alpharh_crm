@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  Settings, 
+  Settings as SettingsIcon, 
   Users, 
   PieChart, 
   FileText, 
@@ -182,6 +182,7 @@ const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
         ? 'bg-white text-[#a524eb] shadow-md shadow-slate-200/50 translate-y-0' 
         : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
     }`}
+    title={label}
   >
     <Icon size={18} className={active ? 'text-[#a524eb]' : 'text-slate-400'} />
     <span>{label}</span>
@@ -192,7 +193,7 @@ const SessionInfo = ({ session }: { session: TrainingSession }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
     <div className="bg-white border border-slate-200 rounded-3xl p-8 space-y-6">
       <h3 className="text-lg font-medium text-slate-900 flex items-center gap-2">
-        <Settings size={20} className="text-[#a524eb]" />
+        <SettingsIcon size={20} className="text-[#a524eb]" />
         Détails de la session
       </h3>
       <div className="grid grid-cols-2 gap-6">
@@ -493,7 +494,13 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="font-medium text-slate-900">{c.amount.toLocaleString()} TND</span>
-                  <button onClick={() => handleDelete(c.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
+                  <button 
+                    onClick={() => handleDelete(c.id)} 
+                    className="text-slate-300 hover:text-red-500"
+                    title="Supprimer cette charge"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             ))}

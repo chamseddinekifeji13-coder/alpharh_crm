@@ -35,7 +35,7 @@ const Sidebar = ({ onLogout, isOpen, onClose }: SidebarProps) => {
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-header-top flex justify-center items-center py-2">
-          <Logo size={100} className="mx-auto" />
+          <Logo sizeClassName="logo-size-sidebar" className="mx-auto" />
           {/* Mobile Close Button (Keep absolutely positioned if needed) */}
           <button 
             className="sidebar-close-mobile absolute right-4 top-4" 

@@ -129,6 +129,12 @@ a {
   height: var(--logo-size);
 }
 
+/* Preset sizes to avoid inline styles */
+.logo-size-sidebar { --logo-size: 100px; }
+.logo-size-login { --logo-size: 60px; }
+.logo-size-default { --logo-size: 40px; }
+.logo-size-small { --logo-size: 32px; }
+
 /* --- Responsive Navigation Controls --- */
 .mobile-menu-toggle {
   display: none;

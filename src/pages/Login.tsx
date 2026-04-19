@@ -60,7 +60,7 @@ const Login = () => {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <div className="login-header">
-          <Logo size={60} className="mb-6 justify-center" />
+          <Logo sizeClassName="logo-size-login" className="mb-6 justify-center" />
           <h2 className="text-[#a524eb] font-medium">Alpha RH CRM</h2>
           <p className="crm-text-sm-muted">Système de gestion des talents et formations</p>
         </div>
