@@ -108,6 +108,14 @@ const TrainingSessionDetail = () => {
   const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0);
   const margin = totalRevenue - totalCosts;
 
+  const start = new Date(session.date_start);
+  const end = new Date(session.date_end);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  const participantCount = registrations.length;
+
   return (
     <div className="crm-container-1200">
       <div className="rh-modal-content xl rh-fiche-premium-container">
@@ -194,6 +202,8 @@ const TrainingSessionDetail = () => {
                    sessionId={session.id}
                    onUpdate={() => loadData(session.id)}
                    isCompleted={session.status === 'completed'}
+                   participantCount={participantCount}
+                   daysCount={daysCount}
                  />
               )}
               {activeTab === 'docs' && (
@@ -430,20 +440,43 @@ const ParticipantsList = ({ session, config, registrations, entreprises, contact
   );
 };
 
-const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate, isCompleted }: any) => {
+const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate, isCompleted, participantCount, daysCount }: any) => {
   const [showAdd, setShowAdd] = useState(false);
   const [newCost, setNewCost] = useState({ type: 'other', amount: 0, description: '' });
+  const [applyPerDay, setApplyPerDay] = useState(false);
+  const [applyPerParticipant, setApplyPerParticipant] = useState(false);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCost.amount || !newCost.description) return;
     
+    let multiplier = 1;
+    let descSuffix = [];
+    if (applyPerDay && daysCount) {
+       multiplier *= daysCount;
+       descSuffix.push(`${daysCount} jours`);
+    }
+    if (applyPerParticipant && participantCount) {
+       multiplier *= Math.max(participantCount, 1);
+       descSuffix.push(`${Math.max(participantCount, 1)} participants`);
+    }
+
+    const finalAmount = newCost.amount * multiplier;
+    let finalDesc = newCost.description;
+    if (descSuffix.length > 0) {
+       finalDesc += ` (Base de calcul : ${newCost.amount} DT/u x ${descSuffix.join(' x ')})`;
+    }
+
     await trainingService.addCost({ 
       ...newCost, 
+      amount: finalAmount,
+      description: finalDesc,
       session_id: sessionId,
       type: newCost.type as CostType
     });
     setNewCost({ type: 'other', amount: 0, description: '' });
+    setApplyPerDay(false);
+    setApplyPerParticipant(false);
     onUpdate();
   };
 
@@ -492,7 +525,7 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate, 
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Montant (DT)</label>
+                  <label>Montant Unitaire (DT)</label>
                   <input 
                     type="number" 
                     placeholder="0.00"
@@ -509,8 +542,20 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate, 
                     onChange={e => setNewCost({...newCost, description: e.target.value})}
                   />
                 </div>
+
+                <div className="form-group col-span-2 flex flex-col gap-3 mt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                    <input type="checkbox" checked={applyPerParticipant} onChange={e => setApplyPerParticipant(e.target.checked)} className="rounded text-[#a524eb] focus:ring-[#a524eb]" />
+                    Multiplier par le nombre de participants inscrits ({participantCount || 0})
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                    <input type="checkbox" checked={applyPerDay} onChange={e => setApplyPerDay(e.target.checked)} className="rounded text-[#a524eb] focus:ring-[#a524eb]" />
+                    Multiplier par le nombre de jours de la session ({daysCount || 1})
+                  </label>
+                </div>
+
                 <div className="col-span-2 flex justify-end gap-2 pt-2">
-                  <button type="submit" className="btn btn-primary">Enregistrer</button>
+                  <button type="submit" className="btn btn-primary">Enregistrer la charge</button>
                   <button type="button" onClick={() => setShowAdd(false)} className="btn btn-outline">Fermer</button>
                 </div>
               </form>
