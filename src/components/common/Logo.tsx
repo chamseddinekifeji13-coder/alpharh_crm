@@ -33,11 +33,11 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
       >
         {customLogo ? (
           /* Render uploaded company logo with flexible width but STRICT height */
-          <div style={{ height: size, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ height: size, width: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img 
               src={customLogo} 
               alt="Logo" 
-              style={{ height: '100%', width: 'auto', maxWidth: '200px', objectFit: 'contain' }}
+              style={{ height: '100%', width: 'auto', maxWidth: '240px', objectFit: 'contain' }}
               onError={(e) => (e.currentTarget.style.display = 'none')} 
             />
           </div>
