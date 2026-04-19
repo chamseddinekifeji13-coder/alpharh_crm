@@ -162,5 +162,24 @@ export const trainingService = {
       .delete()
       .eq('id', id);
     return !error;
+  },
+
+  completeSession: async (sessionId: string): Promise<boolean> => {
+    // 1. Update session status to completed
+    const sessionResult = await supabase
+      .from('training_sessions')
+      .update({ status: 'completed', updated_at: now() })
+      .eq('id', sessionId);
+    
+    if (sessionResult.error) return false;
+
+    // 2. Automate attendance validation for all 'booked' participants
+    const { error: regError } = await supabase
+      .from('training_registrations')
+      .update({ status: 'attended', updated_at: now() })
+      .eq('session_id', sessionId)
+      .eq('status', 'booked');
+
+    return !regError;
   }
 };

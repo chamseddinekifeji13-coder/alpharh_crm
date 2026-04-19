@@ -1149,3 +1149,18 @@ input:focus, select:focus, textarea:focus {
   width: 100% !important;
   justify-content: center !important;
 }
+
+/* ─── Training Module Utilities ─── */
+.rh-fiche-premium-container {
+  padding: 0;
+  min-height: 80vh;
+}
+
+.rh-text-gold {
+  color: #d4af37;
+}
+
+.rh-tag-success {
+  background: #dcfce7;
+  color: #16a34a;
+}

@@ -115,5 +115,91 @@ export const trainingDocGenerator = {
     doc.text(config?.company_name || 'L\'équipe Alpha RH', 14, 192);
 
     doc.save(`Convocation_${participant.participant_name || 'Participant'}.pdf`);
+  },
+
+  // ─── 3. Attestation de Participation ──────────────────────────────────────
+  generateCertificate: async (session: TrainingSession, participant: TrainingRegistration, config: ConfigCRM | null) => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const accentColor = config?.accent_color || '#a524eb';
+    
+    // Bordure Élégante
+    doc.setDrawColor(accentColor);
+    doc.setLineWidth(1.5);
+    doc.rect(5, 5, 287, 200); // Bordure extérieure
+    doc.setLineWidth(0.5);
+    doc.rect(7, 7, 283, 196); // Bordure intérieure
+    
+    // Filigrane discret ou motif de coin (facultatif)
+    doc.setDrawColor(240);
+    doc.setLineWidth(0.1);
+    for(let i=0; i<10; i++) {
+        doc.line(0, i*22, 300, i*22);
+    }
+    
+    // Logo Centré
+    if (config?.company_logo_url) {
+      try { 
+        doc.addImage(config.company_logo_url, 'PNG', 133, 15, 30, 30, undefined, 'FAST'); 
+      } catch(e) {}
+    }
+    
+    // Titre Principal
+    doc.setTextColor(accentColor);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(36);
+    doc.text('ATTESTATION DE FORMATION', 148, 65, { align: 'center' });
+    
+    doc.setDrawColor(accentColor);
+    doc.setLineWidth(1);
+    doc.line(100, 70, 196, 70);
+    
+    // Corps de l'attestation
+    doc.setTextColor(60);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(16);
+    doc.text('L\'organisme de formation', 148, 85, { align: 'center' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(0);
+    doc.text(config?.company_name || 'Alpha RH', 148, 95, { align: 'center' });
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(16);
+    doc.setTextColor(60);
+    doc.text('certifie que', 148, 110, { align: 'center' });
+    
+    doc.setFontSize(26);
+    doc.setTextColor(accentColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text(participant.participant_name || participant.contact_nom || 'M./Mme Participant', 148, 125, { align: 'center' });
+    
+    doc.setFontSize(16);
+    doc.setTextColor(60);
+    doc.setFont('helvetica', 'normal');
+    doc.text('a suivi avec succès l\'action de formation intitulée :', 148, 142, { align: 'center' });
+    
+    doc.setFontSize(20);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bolditalic');
+    doc.text(`"${session.title}"`, 148, 155, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.setTextColor(80);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Thématique : ${session.theme}`, 148, 165, { align: 'center' });
+    doc.text(`Réalisée du ${new Date(session.date_start).toLocaleDateString()} au ${new Date(session.date_end).toLocaleDateString()}`, 148, 172, { align: 'center' });
+    
+    // Bas de page : Signature && Date
+    const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Fait à ${config?.city || 'Tunis'}, le ${today}`, 235, 185, { align: 'center' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0);
+    doc.text('La Direction', 235, 192, { align: 'center' });
+    
+    doc.save(`Attestation_${participant.participant_name || 'Participant'}.pdf`);
   }
 };

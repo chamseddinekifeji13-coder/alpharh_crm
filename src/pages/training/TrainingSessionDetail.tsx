@@ -14,7 +14,19 @@ import {
   MapPin,
   CheckCircle2,
   AlertTriangle,
-  Download
+  Download,
+  X,
+  Edit2,
+  Layout,
+  GraduationCap,
+  Briefcase,
+  Clock,
+  ShoppingBag,
+  History,
+  Mail,
+  Phone,
+  Target,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trainingService } from '../../utils/trainingService';
@@ -56,20 +68,37 @@ const TrainingSessionDetail = () => {
   }, [id]);
 
   const loadData = async (sessionId: string) => {
-    setLoading(true);
-    const [s, r, c, ent, cont] = await Promise.all([
-      trainingService.getSessionById(sessionId),
-      trainingService.getRegistrations(sessionId),
-      trainingService.getCosts(sessionId),
-      entrepriseService.getAll(),
-      contactService.getAll()
-    ]);
-    setSession(s);
-    setRegistrations(r);
-    setCosts(c);
-    setEntreprises(ent);
-    setContacts(cont);
-    setLoading(false);
+    try {
+      const [sessionData, registrationsData, costsData, ent, cont] = await Promise.all([
+        trainingService.getSessionById(sessionId),
+        trainingService.getRegistrations(sessionId),
+        trainingService.getCosts(sessionId),
+        entrepriseService.getAll(),
+        contactService.getAll()
+      ]);
+
+      if (sessionData) setSession(sessionData);
+      setRegistrations(registrationsData);
+      setCosts(costsData);
+      setEntreprises(ent);
+      setContacts(cont);
+    } catch (error) {
+      console.error('Error loading session data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteSession = async () => {
+    if (!session) return;
+    if (!window.confirm("Êtes-vous sûr de vouloir clôturer cette session ? \n\nLes participants inscrits seront marqués comme 'Présents' et les modifications seront verrouillées.")) return;
+
+    const success = await trainingService.completeSession(session.id);
+    if (success) {
+      loadData(session.id);
+    } else {
+      alert("Une erreur est survenue lors de la clôture de la session.");
+    }
   };
 
   if (loading) return <div className="p-20 text-center text-slate-400">Préliminaire...</div>;
@@ -80,159 +109,160 @@ const TrainingSessionDetail = () => {
   const margin = totalRevenue - totalCosts;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <button 
-          onClick={() => navigate('/training/sessions')}
-          className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all"
-          title="Retour au catalogue"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-medium text-slate-900">{session.title}</h1>
-            <span className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
-              Inter-entreprises
-            </span>
+    <div className="crm-container-1200">
+      <div className="rh-modal-content xl rh-fiche-premium-container">
+        
+        {/* En-tête de la fiche Session */}
+        <div className="rh-modal-header rh-modal-header-dark">
+          <div className="rh-modal-header-info">
+            <div className="crm-avatar rh-avatar-xl bg-[#a524eb] text-white">
+              <GraduationCap size={32} />
+            </div>
+            <div className="rh-modal-title-group">
+              <div className="rh-modal-subtitle rh-modal-subtitle-light rh-text-gold font-semibold text-[0.75rem] uppercase">
+                Session Inter-entreprises
+              </div>
+              <h2 className="rh-modal-title rh-modal-title-light">{session.title}</h2>
+              <div className="rh-modal-subtitle rh-modal-subtitle-light">
+                <Target size={16} /> 
+                {session.theme}
+              </div>
+            </div>
           </div>
-          <p className="text-slate-500">{session.theme}</p>
+          <div className="rh-fiche-actions-top">
+            {session.status !== 'completed' && (
+              <button 
+                onClick={handleCompleteSession}
+                className="btn btn-primary bg-emerald-600 hover:bg-emerald-700 border-none px-6"
+                title="Clôturer et valider les présences"
+              >
+                <CheckCircle2 size={18} />
+                <span>Clôturer Session</span>
+              </button>
+            )}
+            <button className="crm-fiche-btn" onClick={() => navigate('/training/sessions')} title="Retour au catalogue"><ArrowLeft size={20} /></button>
+            <button className="crm-fiche-btn" onClick={() => navigate('/training/sessions')} title="Fermer"><X size={20} /></button>
+          </div>
+        </div>
+
+        {/* Navigation par onglets style CRM */}
+        <div className="rh-fiche-tab-nav">
+          {[
+            { id: 'info', label: 'Détails Session', icon: <Calendar size={16} /> },
+            { id: 'participants', label: 'Participants', icon: <Users size={16} /> },
+            { id: 'finance', label: 'Bilan Financier', icon: <PieChart size={16} /> },
+            { id: 'docs', label: 'Documents', icon: <FileText size={16} /> },
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              className={`rh-fiche-tab-btn ${activeTab === tab.id ? 'active' : ''}`} 
+              onClick={() => setActiveTab(tab.id as any)}
+            >
+              <span className="rh-section-header-title">{tab.icon} {tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rh-modal-body rh-modal-body-premium">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === 'info' && <SessionInfo session={session} />}
+              {activeTab === 'participants' && (
+                <ParticipantsList 
+                  session={session}
+                  config={config}
+                  registrations={registrations} 
+                  entreprises={entreprises}
+                  contacts={contacts}
+                  sessionId={session.id}
+                  basePrice={session.base_price_per_participant}
+                  onUpdate={() => loadData(session.id)}
+                />
+              )}
+              {activeTab === 'finance' && (
+                 <FinanceBilan 
+                   revenue={totalRevenue}
+                   costs={totalCosts}
+                   margin={margin}
+                   costsList={costs}
+                   sessionId={session.id}
+                   onUpdate={() => loadData(session.id)}
+                   isCompleted={session.status === 'completed'}
+                 />
+              )}
+              {activeTab === 'docs' && (
+                <DocumentsManager 
+                  session={session} 
+                  participants={registrations} 
+                  config={config} 
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
-
-      {/* Tabs Navigation */}
-        <div className="flex gap-2 p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-2xl w-fit mb-8 border border-white/50">
-          <TabButton 
-            active={activeTab === 'info'} 
-            onClick={() => setActiveTab('info')} 
-            icon={Calendar} 
-            label="Session" 
-          />
-          <TabButton 
-            active={activeTab === 'participants'} 
-            onClick={() => setActiveTab('participants')} 
-            icon={Users} 
-            label="Participants" 
-          />
-          <TabButton 
-            active={activeTab === 'finance'} 
-            onClick={() => setActiveTab('finance')} 
-            icon={PieChart} 
-            label="Bilan Financier" 
-          />
-          <TabButton 
-            active={activeTab === 'docs'} 
-            onClick={() => setActiveTab('docs')} 
-            icon={FileText} 
-            label="Documents" 
-          />
-        </div>
-
-      {/* Tab Content */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === 'info' && <SessionInfo session={session} />}
-          {activeTab === 'participants' && (
-            <ParticipantsList 
-              registrations={registrations} 
-              entreprises={entreprises}
-              contacts={contacts}
-              sessionId={session.id}
-              basePrice={session.base_price_per_participant}
-              onUpdate={() => loadData(session.id)}
-            />
-          )}
-          {activeTab === 'finance' && (
-             <FinanceBilan 
-               revenue={totalRevenue}
-               costs={totalCosts}
-               margin={margin}
-               costsList={costs}
-               sessionId={session.id}
-               onUpdate={() => loadData(session.id)}
-             />
-          )}
-          {activeTab === 'docs' && (
-            <DocumentsManager 
-              session={session} 
-              participants={registrations} 
-              config={config} 
-            />
-          )}
-        </motion.div>
-      </AnimatePresence>
     </div>
   );
 };
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl transition-all duration-300 font-medium text-sm ${
-      active 
-        ? 'bg-white text-[#a524eb] shadow-md shadow-slate-200/50 translate-y-0' 
-        : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-    }`}
-    title={label}
-  >
-    <Icon size={18} className={active ? 'text-[#a524eb]' : 'text-slate-400'} />
-    <span>{label}</span>
-  </button>
-);
-
 const SessionInfo = ({ session }: { session: TrainingSession }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-    <div className="bg-white border border-slate-200 rounded-3xl p-8 space-y-6">
-      <h3 className="text-lg font-medium text-slate-900 flex items-center gap-2">
-        <SettingsIcon size={20} className="text-[#a524eb]" />
-        Détails de la session
+  <div className="rh-form-grid">
+    <div className="col-span-4">
+      <h3 className="rh-section-header rh-section-header-title">
+        <Target size={18} /> Profil de la session
       </h3>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="crm-remarques-box">
+        {session.theme}
+      </div>
+      
+      <div className="rh-section-header rh-mt-lg">
+        <Calendar size={16} /> Planification & Logistique
+      </div>
+      <div className="crm-info-grid rh-mt-md">
         <InfoItem icon={Calendar} label="Dates" value={`${new Date(session.date_start).toLocaleDateString()} au ${new Date(session.date_end).toLocaleDateString()}`} />
         <InfoItem icon={User} label="Formateur" value={session.trainer_name || 'Non assigné'} />
         <InfoItem icon={MapPin} label="Lieu / Salle" value={session.room_name || 'Salle non définie'} />
-        <InfoItem icon={CheckCircle2} label="Statut" value={SESSION_STATUS_LABELS[session.status]} />
-      </div>
-      <div className="pt-6 border-t border-slate-100">
-        <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Thème de formation</label>
-        <p className="text-slate-700 mt-2 leading-relaxed">{session.theme}</p>
+        <InfoItem icon={CheckCircle2} label="Statut Session" value={SESSION_STATUS_LABELS[session.status]} />
       </div>
     </div>
     
-    <div className="bg-gradient-to-br from-[#a524eb] to-[#821bc1] rounded-3xl p-8 text-white">
-      <h3 className="text-lg font-light opacity-90 mb-6">Conditions Commerciales</h3>
-      <div className="space-y-4">
-        <div className="flex justify-between items-end">
-          <span className="opacity-80">Prix de base par participant</span>
-          <span className="text-3xl font-medium">{session.base_price_per_participant.toLocaleString()} TND</span>
+    <div className="col-span-2">
+      <h3 className="rh-section-header rh-section-header-title">
+        <ShoppingBag size={18} /> Conditions
+      </h3>
+      <div className="rh-kpi-card rh-kpi-card-mini">
+        <div className="rh-kpi-icon rh-kpi-icon-purple"><DollarSignIcon /></div>
+        <div className="rh-kpi-content">
+          <span className="rh-kpi-value">{session.base_price_per_participant.toLocaleString()} DT</span>
+          <span className="rh-kpi-label">Prix de base / Participant</span>
         </div>
-        <p className="text-sm opacity-70 italic mt-4">Note : Ce prix peut être négocié individuellement pour chaque inscription dans l'onglet des participants.</p>
+      </div>
+      <div className="crm-remarques-box rh-mt-sm bg-blue-50 border-blue-200 text-blue-800">
+        <p className="text-xs italic">Note : Ce prix peut être négocié individuellement pour chaque inscription dans l'onglet des participants.</p>
       </div>
     </div>
   </div>
 );
 
 const InfoItem = ({ icon: Icon, label, value }: any) => (
-  <div>
-    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-1">
+  <div className="crm-info-item">
+    <div className="crm-info-label">
       <Icon size={14} />
       {label}
-    </label>
-    <p className="text-slate-900 font-medium">{value}</p>
+    </div>
+    <div className="crm-info-value">{value}</div>
   </div>
 );
 
-const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, basePrice, onUpdate }: any) => {
+const ParticipantsList = ({ session, config, registrations, entreprises, contacts, sessionId, basePrice, onUpdate }: any) => {
   const [showAdd, setShowAdd] = useState(false);
+  const isCompleted = session.status === 'completed';
   const [formData, setFormData] = useState({
     entreprise_id: '',
     contact_id: '',
@@ -243,7 +273,7 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.entreprise_id) return;
+    if (isCompleted || !formData.entreprise_id) return;
     
     await trainingService.addRegistration({
       ...formData,
@@ -251,7 +281,6 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
       status: 'booked'
     } as any);
     
-    // Reset state but keep form open for more participants
     setFormData({
       entreprise_id: '',
       contact_id: '',
@@ -271,26 +300,30 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-slate-900">Liste des Inscrits ({registrations.length})</h3>
-        <button 
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl shadow-sm hover:border-[#a524eb]/30 hover:text-[#a524eb] transition-all font-medium active:scale-95"
-        >
-          <Plus size={18} />
-          <span>Inscrire un participant</span>
-        </button>
-      </div>
+      <header className="flex justify-between items-center mb-6 px-4">
+        <h3 className="text-lg font-medium text-slate-800 flex items-center gap-2">
+          <Users size={20} className="text-[#a524eb]" /> Registre des Participants
+          {isCompleted && <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full ml-2">Session Clôturée</span>}
+        </h3>
+        {!isCompleted && (
+          <button 
+            onClick={() => setShowAdd(!showAdd)}
+            className="btn btn-primary btn-sm"
+          >
+            {showAdd ? <X size={16} /> : <Plus size={16} />}
+            <span>{showAdd ? 'Annuler' : 'Inscrire un participant'}</span>
+          </button>
+        )}
+      </header>
 
       {showAdd && (
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="rh-modal-content p-6 border border-slate-200">
           <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Entreprise</label>
+            <div className="form-group">
+              <label>Entreprise</label>
               <select 
                 title="Sélectionner une entreprise"
                 required
-                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.entreprise_id}
                 onChange={e => setFormData({...formData, entreprise_id: e.target.value})}
               >
@@ -298,11 +331,10 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
                 {entreprises.map((e: any) => <option key={e.id} value={e.id}>{e.raison_sociale}</option>)}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Contact (Référent)</label>
+            <div className="form-group">
+              <label>Contact (Référent)</label>
               <select 
                 title="Sélectionner un contact"
-                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.contact_id}
                 onChange={e => setFormData({...formData, contact_id: e.target.value})}
               >
@@ -312,85 +344,83 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
                 ))}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Prix Négocié (TND)</label>
+            <div className="form-group">
+              <label>Prix Négocié (TND)</label>
               <input 
                 title="Prix négocié"
                 type="number"
-                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.negotiated_price}
                 onChange={e => setFormData({...formData, negotiated_price: parseFloat(e.target.value)})}
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Nom du Participant (Si différent)</label>
+            <div className="form-group lg:col-span-2">
+              <label>Nom du Participant (Si différent)</label>
               <input 
                 type="text"
                 placeholder="Nom complet"
-                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.participant_name}
                 onChange={e => setFormData({...formData, participant_name: e.target.value})}
               />
             </div>
-            <div className="flex items-end gap-3 lg:col-span-2 pt-2">
-              <button 
-                type="submit" 
-                className="px-8 py-3 bg-gradient-to-r from-[#a524eb] to-[#7c1dc2] text-white rounded-2xl shadow-lg shadow-purple-100 font-medium hover:shadow-purple-200 transition-all active:scale-95"
-              >
-                Confirmer l'inscription
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setShowAdd(false)} 
-                className="px-8 py-3 bg-slate-100 text-slate-600 rounded-2xl font-medium hover:bg-slate-200 transition-all"
-              >
-                Annuler
-              </button>
+            <div className="flex items-end gap-3 pt-2">
+              <button type="submit" className="btn btn-primary flex-1">Confirmer</button>
+              <button type="button" onClick={() => setShowAdd(false)} className="btn btn-outline">Annuler</button>
             </div>
           </form>
         </motion.div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 font-medium text-slate-700">Entreprise / Client</th>
-              <th className="px-6 py-4 font-medium text-slate-700">Participant Nommé</th>
-              <th className="px-6 py-4 font-medium text-slate-700">Statut</th>
-              <th className="px-6 py-4 font-medium text-slate-700 text-right">Montant</th>
-              <th className="px-6 py-4 font-medium text-slate-700 text-right">Actions</th>
+      <div className="crm-table-wrapper">
+        <table className="crm-table">
+          <thead>
+            <tr className="crm-table-head-row">
+              <th className="crm-th">Entreprise / Client</th>
+              <th className="crm-th">Participant Nommé</th>
+              <th className="crm-th">Statut</th>
+              <th className="crm-th text-right">Montant</th>
+              <th className="crm-th text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {registrations.map((reg: any) => (
-              <tr key={reg.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 font-medium text-slate-900">{reg.entreprise_nom}</td>
-                <td className="px-6 py-4 text-slate-600 italic">
+              <tr key={reg.id} className="crm-table-row">
+                <td className="crm-td crm-td-bold">{reg.entreprise_nom}</td>
+                <td className="crm-td crm-td-text italic">
                   {reg.participant_name || reg.contact_nom || 'Non spécifié'}
                 </td>
-                <td className="px-6 py-4">
-                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-xs font-medium">
+                <td className="crm-td">
+                  <span className="crm-tag-pill rh-tag-success">
                     {REGISTRATION_STATUS_LABELS[reg.status as RegistrationStatus]}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right font-medium text-slate-900">
-                  {reg.negotiated_price?.toLocaleString() || basePrice.toLocaleString()} TND
+                <td className="crm-td text-right crm-td-bold">
+                  {reg.negotiated_price?.toLocaleString() || basePrice.toLocaleString()} DT
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <button 
-                    onClick={() => handleDelete(reg.id)}
-                    className="p-2 text-slate-300 hover:text-red-500 rounded-lg transition-all"
-                    title="Désinscrire ce participant"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                <td className="crm-td">
+                  <div className="crm-row-actions justify-end">
+                    <button 
+                      onClick={() => trainingDocGenerator.generateCertificate(session, reg, config)}
+                      className="p-2 text-[#a524eb] hover:bg-purple-50 rounded-lg transition-colors"
+                      title="Imprimer l'attestation de participation"
+                    >
+                      <Award size={18} />
+                    </button>
+                    {!isCompleted && (
+                      <button 
+                        onClick={() => handleDelete(reg.id)}
+                        className="crm-btn-danger-md"
+                        title="Désinscrire ce participant"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
             {registrations.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-10 text-center text-slate-400">Aucun participant inscrit.</td>
+                <td colSpan={5} className="crm-table-empty">Aucun participant inscrit.</td>
               </tr>
             )}
           </tbody>
@@ -400,7 +430,7 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
   );
 };
 
-const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }: any) => {
+const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate, isCompleted }: any) => {
   const [showAdd, setShowAdd] = useState(false);
   const [newCost, setNewCost] = useState({ type: 'other', amount: 0, description: '' });
 
@@ -413,7 +443,6 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
       session_id: sessionId,
       type: newCost.type as CostType
     });
-    // Reset state but KEEP form open for multiple additions
     setNewCost({ type: 'other', amount: 0, description: '' });
     onUpdate();
   };
@@ -425,78 +454,81 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
 
   return (
     <div className="space-y-8">
-      {/* Cards KPI */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="rh-kpi-grid">
         <KPIBox label="Chiffre d'Affaires" value={revenue} color="violet" icon={DollarSignIcon} />
         <KPIBox label="Total des Charges" value={costs} color="red" icon={Trash2} />
-        <KPIBox label="Marge Commerciale" value={margin} color={margin >= 0 ? 'emerald' : 'red'} icon={PieChart} />
+        <KPIBox label="Marge brute" value={margin} color={margin >= 0 ? 'emerald' : 'red'} icon={PieChart} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Cost List */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-medium text-slate-900">Détail des Charges</h3>
-            <button 
-              onClick={() => setShowAdd(true)} 
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:border-red-200 hover:text-red-500 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-            >
-              <Plus size={16} /> Ajouter une charge
-            </button>
+      <div className="rh-form-grid">
+        <div className="col-span-4 rh-modal-content p-6 border border-slate-200">
+          <div className="crm-page-header">
+            <h3 className="crm-page-title text-lg">Détail des Charges</h3>
+            {!isCompleted && (
+              <button 
+                onClick={() => setShowAdd(true)} 
+                className="btn btn-outline py-2"
+              >
+                <Plus size={16} /> Ajouter une charge
+              </button>
+            )}
           </div>
 
-          {showAdd && (
-            <div className="bg-slate-50 p-4 rounded-2xl mb-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <select 
-                  title="Catégorie de dépense"
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm"
-                  value={newCost.type}
-                  onChange={e => setNewCost({...newCost, type: e.target.value})}
-                >
-                  {Object.entries(COST_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-                <input 
-                  type="number" 
-                  placeholder="Montant TND"
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm"
-                  onChange={e => setNewCost({...newCost, amount: parseFloat(e.target.value)})}
-                />
-              </div>
-              <textarea 
-                placeholder="Description..."
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm"
-                onChange={e => setNewCost({...newCost, description: e.target.value})}
-              />
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  onClick={handleAdd} 
-                  className="px-6 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
-                >
-                  Ajouter la dépense
-                </button>
-                <button 
-                  onClick={() => setShowAdd(false)} 
-                  className="px-6 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-all"
-                >
-                  Fermer
-                </button>
-              </div>
-            </div>
+          {!isCompleted && showAdd && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-200"
+            >
+              <form onSubmit={handleAdd} className="grid grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label>Type de dépense</label>
+                  <select 
+                    title="Catégorie de dépense"
+                    value={newCost.type}
+                    onChange={e => setNewCost({...newCost, type: e.target.value})}
+                  >
+                    {Object.entries(COST_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Montant (DT)</label>
+                  <input 
+                    type="number" 
+                    placeholder="0.00"
+                    value={newCost.amount || ''}
+                    onChange={e => setNewCost({...newCost, amount: parseFloat(e.target.value)})}
+                  />
+                </div>
+                <div className="form-group col-span-2">
+                  <label>Description / Justificatif</label>
+                  <textarea 
+                    placeholder="Précisez la nature de la dépense..."
+                    rows={2}
+                    value={newCost.description}
+                    onChange={e => setNewCost({...newCost, description: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-2 flex justify-end gap-2 pt-2">
+                  <button type="submit" className="btn btn-primary">Enregistrer</button>
+                  <button type="button" onClick={() => setShowAdd(false)} className="btn btn-outline">Fermer</button>
+                </div>
+              </form>
+            </motion.div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {costsList.map((c: any) => (
-              <div key={c.id} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+              <div key={c.id} className="flex justify-between items-center p-4 bg-white rounded-xl border border-slate-100 hover:border-slate-200 transition-all">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{COST_TYPE_LABELS[c.type as keyof typeof COST_TYPE_LABELS]}</p>
-                  <p className="text-xs text-slate-500">{c.description}</p>
+                  <p className="crm-text-name-sm">{COST_TYPE_LABELS[c.type as keyof typeof COST_TYPE_LABELS]}</p>
+                  <p className="crm-text-sub">{c.description}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-medium text-slate-900">{c.amount.toLocaleString()} TND</span>
+                  <span className="crm-text-amount">{c.amount.toLocaleString()} DT</span>
                   <button 
                     onClick={() => handleDelete(c.id)} 
-                    className="text-slate-300 hover:text-red-500"
+                    className="crm-btn-danger"
                     title="Supprimer cette charge"
                   >
                     <Trash2 size={16} />
@@ -504,17 +536,39 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
                 </div>
               </div>
             ))}
-            {costsList.length === 0 && <p className="text-center py-6 text-slate-400 italic text-sm">Aucune charge déclarée.</p>}
+            {costsList.length === 0 && <div className="crm-table-empty">Aucune charge déclarée pour cette session.</div>}
           </div>
         </div>
 
-        <div className="bg-slate-50 rounded-3xl p-8 border border-slate-100 h-fit">
-           <h3 className="font-medium text-slate-900 mb-4">Analyse de Rentabilité</h3>
-           <p className="text-sm text-slate-600 mb-6 font-light">Le point mort est calculé sur la base du CA collecté. Actuellement votre rentabilité brute est de :</p>
-           <div className={`text-4xl font-medium ${margin >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-             {((margin / (revenue || 1)) * 100).toFixed(1)}%
+        <div className="col-span-2 space-y-6">
+           <div className="rh-modal-content p-8 bg-slate-50 border-none">
+              <h3 className="crm-section-title flex items-center gap-2">
+                 <History size={18} className="text-slate-400" /> Analyse de Rentabilité
+              </h3>
+              <p className="crm-text-sm-muted mb-6">Indicateur de performance brute basé sur le CA collecté et les charges directes.</p>
+              
+              <div className="flex items-baseline gap-2">
+                <span className={`text-5xl font-bold ${margin >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {((margin / (revenue || 1)) * 100).toFixed(1)}%
+                </span>
+                <span className="crm-text-xs-muted">de marge brute</span>
+              </div>
+              
+              <div className="rh-mt-lg pt-6 border-t border-slate-200">
+                 <div className="flex justify-between text-sm mb-2">
+                    <span className="text-slate-500">Break-even point</span>
+                    <span className="font-semibold text-slate-700">{costs.toLocaleString()} DT</span>
+                 </div>
+                  <div className="w-full bg-slate-200 rounded-full h-1.5">
+                    <motion.div 
+                      className={`h-1.5 rounded-full ${margin >= 0 ? 'bg-emerald-500' : 'bg-red-400'}`} 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, (revenue / (costs || 1)) * 100)}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                    />
+                  </div>
+              </div>
            </div>
-           <p className="text-xs text-slate-400 mt-2">Marge calculée hors taxes et hors commissions variables supplémentaires.</p>
         </div>
       </div>
     </div>
@@ -522,15 +576,17 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
 };
 
 const KPIBox = ({ label, value, color, icon: Icon }: any) => (
-  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
-    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
-      color === 'violet' ? 'bg-purple-100 text-[#a524eb]' : 
-      color === 'red' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+  <div className="rh-kpi-card">
+    <div className={`rh-kpi-icon ${
+      color === 'violet' ? 'rh-kpi-icon-purple' : 
+      color === 'red' ? 'rh-danger-bg text-white' : 'rh-kpi-icon-success'
     }`}>
-      <Icon size={20} />
+      <Icon size={18} />
     </div>
-    <p className="text-sm text-slate-500 font-medium">{label}</p>
-    <p className="text-2xl font-medium text-slate-900 mt-1">{value.toLocaleString()} <span className="text-sm font-light">TND</span></p>
+    <div className="rh-kpi-content">
+      <span className="rh-kpi-value">{value.toLocaleString()} DT</span>
+      <span className="rh-kpi-label">{label}</span>
+    </div>
   </div>
 );
 
@@ -539,17 +595,43 @@ const DollarSignIcon = () => <span className="font-bold text-xl">$</span>;
 const DocumentsManager = ({ session, participants, config }: any) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <DocCard 
-        title="Liste d'émargement" 
-        description="Fichier PDF contenant les noms des participants pour signature." 
-        onDownload={() => trainingDocGenerator.generateAttendanceSheet(session, participants, config)} 
-      />
+      <div className="space-y-6">
+        <DocCard 
+          title="Liste d'émargement" 
+          description="Fichier PDF contenant les noms des participants pour signature." 
+          onDownload={() => trainingDocGenerator.generateAttendanceSheet(session, participants, config)} 
+        />
+        
+        <div className="space-y-4">
+          <h4 className="font-medium text-slate-700 px-2 flex items-center gap-2">
+            <Award size={18} className="text-[#a524eb]" /> Attestations de participation
+          </h4>
+          <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+            {participants.map((p: any) => (
+              <div key={p.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-2xl hover:border-purple-200 transition-colors">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{p.participant_name || p.contact_nom}</p>
+                  <p className="text-xs text-slate-500">{p.entreprise_nom}</p>
+                </div>
+                <button 
+                  onClick={() => trainingDocGenerator.generateCertificate(session, p, config)}
+                  className="p-2 text-[#a524eb] hover:bg-purple-50 rounded-lg"
+                  title="Générer l'attestation"
+                >
+                  <Download size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <h4 className="font-medium text-slate-700 px-2">Convocations individuelles</h4>
         {participants.length === 0 ? (
            <p className="text-sm text-slate-400 px-2 italic">Aucun participant à convoquer.</p>
         ) : (
-          <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+          <div className="max-h-[500px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
             {participants.map((p: any) => (
               <div key={p.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-2xl">
                 <div>
@@ -558,7 +640,7 @@ const DocumentsManager = ({ session, participants, config }: any) => {
                 </div>
                 <button 
                   onClick={() => trainingDocGenerator.generateConvocation(session, p, config)}
-                  className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                  className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                   aria-label="Télécharger la convocation"
                 >
                   <Download size={16} />
