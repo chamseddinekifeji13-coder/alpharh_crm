@@ -187,17 +187,17 @@ const TrainingSessionList = () => {
                     onChange={e => setFormData({...formData, base_price_per_participant: parseFloat(e.target.value)})}
                   />
                 </div>
-                <div className="md:col-span-2 flex items-end gap-3">
+                <div className="md:col-span-2 flex items-end gap-3 pt-4 border-t border-slate-100 mt-2">
                   <button 
                     type="submit"
-                    className="flex-1 py-3 bg-[#a524eb] text-white rounded-2xl font-medium shadow-lg shadow-purple-100 hover:bg-[#821bc1] transition-all"
+                    className="flex-1 py-4 bg-[#a524eb] text-white rounded-2xl font-medium shadow-xl shadow-purple-100 hover:bg-[#821bc1] transition-all text-lg"
                   >
                     Créer la session d'action
                   </button>
                   <button 
                     type="button"
                     onClick={() => setShowAdd(false)}
-                    className="px-8 py-3 bg-slate-100 text-slate-600 rounded-2xl font-medium hover:bg-slate-200 transition-all"
+                    className="px-10 py-4 bg-slate-100 text-slate-600 rounded-2xl font-medium hover:bg-slate-200 transition-all text-lg"
                   >
                     Annuler
                   </button>
