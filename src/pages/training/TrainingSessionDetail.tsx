@@ -98,12 +98,32 @@ const TrainingSessionDetail = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit mb-8">
-        <TabButton active={activeTab === 'info'} onClick={() => setActiveTab('info')} icon={Settings} label="Session" />
-        <TabButton active={activeTab === 'participants'} onClick={() => setActiveTab('participants')} icon={Users} label="Participants" />
-        <TabButton active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={PieChart} label="Bilan Financier" />
-        <TabButton active={activeTab === 'docs'} onClick={() => setActiveTab('docs')} icon={FileText} label="Documents" />
-      </div>
+        <div className="flex gap-2 p-1.5 bg-slate-100/50 backdrop-blur-sm rounded-2xl w-fit mb-8 border border-white/50">
+          <TabButton 
+            active={activeTab === 'info'} 
+            onClick={() => setActiveTab('info')} 
+            icon={Calendar} 
+            label="Session" 
+          />
+          <TabButton 
+            active={activeTab === 'participants'} 
+            onClick={() => setActiveTab('participants')} 
+            icon={Users} 
+            label="Participants" 
+          />
+          <TabButton 
+            active={activeTab === 'finance'} 
+            onClick={() => setActiveTab('finance')} 
+            icon={PieChart} 
+            label="Bilan Financier" 
+          />
+          <TabButton 
+            active={activeTab === 'docs'} 
+            onClick={() => setActiveTab('docs')} 
+            icon={FileText} 
+            label="Documents" 
+          />
+        </div>
 
       {/* Tab Content */}
       <AnimatePresence mode="wait">
@@ -151,13 +171,15 @@ const TrainingSessionDetail = () => {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
-  <button 
+  <button
     onClick={onClick}
-    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${
-      active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+    className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl transition-all duration-300 font-medium text-sm ${
+      active 
+        ? 'bg-white text-[#a524eb] shadow-md shadow-slate-200/50 translate-y-0' 
+        : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
     }`}
   >
-    <Icon size={18} />
+    <Icon size={18} className={active ? 'text-[#a524eb]' : 'text-slate-400'} />
     <span>{label}</span>
   </button>
 );
@@ -248,10 +270,10 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
         <h3 className="text-lg font-medium text-slate-900">Liste des Inscrits ({registrations.length})</h3>
         <button 
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all"
+          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl shadow-sm hover:border-[#a524eb]/30 hover:text-[#a524eb] transition-all font-medium active:scale-95"
         >
           <Plus size={18} />
-          <span>Ajouter un participant</span>
+          <span>Inscrire un participant</span>
         </button>
       </div>
 
@@ -302,9 +324,20 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
                 onChange={e => setFormData({...formData, participant_name: e.target.value})}
               />
             </div>
-            <div className="flex items-end gap-3 lg:col-span-2">
-              <button type="submit" className="px-6 py-2 bg-[#a524eb] text-white rounded-xl">Confirmer l'inscription</button>
-              <button type="button" onClick={() => setShowAdd(false)} className="px-6 py-2 bg-slate-200 text-slate-700 rounded-xl">Annuler</button>
+            <div className="flex items-end gap-3 lg:col-span-2 pt-2">
+              <button 
+                type="submit" 
+                className="px-8 py-3 bg-gradient-to-r from-[#a524eb] to-[#7c1dc2] text-white rounded-2xl shadow-lg shadow-purple-100 font-medium hover:shadow-purple-200 transition-all active:scale-95"
+              >
+                Confirmer l'inscription
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setShowAdd(false)} 
+                className="px-8 py-3 bg-slate-100 text-slate-600 rounded-2xl font-medium hover:bg-slate-200 transition-all"
+              >
+                Annuler
+              </button>
             </div>
           </form>
         </motion.div>
@@ -391,7 +424,10 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
         <div className="bg-white border border-slate-200 rounded-3xl p-6">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-medium text-slate-900">Détail des Charges</h3>
-            <button onClick={() => setShowAdd(true)} className="text-[#a524eb] text-sm font-medium hover:underline flex items-center gap-1">
+            <button 
+              onClick={() => setShowAdd(true)} 
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:border-red-200 hover:text-red-500 transition-all flex items-center gap-2 shadow-sm active:scale-95"
+            >
               <Plus size={16} /> Ajouter une charge
             </button>
           </div>
@@ -418,9 +454,19 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm"
                 onChange={e => setNewCost({...newCost, description: e.target.value})}
               />
-              <div className="flex justify-end gap-2">
-                <button onClick={handleAdd} className="px-4 py-1.5 bg-slate-900 text-white rounded-lg text-sm">Ajouter</button>
-                <button onClick={() => setShowAdd(false)} className="px-4 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-sm">Annuler</button>
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  onClick={handleAdd} 
+                  className="px-6 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                >
+                  Ajouter la dépense
+                </button>
+                <button 
+                  onClick={() => setShowAdd(false)} 
+                  className="px-6 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-all"
+                >
+                  Fermer
+                </button>
               </div>
             </div>
           )}

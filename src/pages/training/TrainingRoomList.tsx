@@ -46,14 +46,14 @@ const TrainingRoomList = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <header className="flex justify-between items-center mb-8">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
         <div>
-          <h1 className="text-3xl font-medium tracking-tight text-slate-900">Salles de Formation</h1>
-          <p className="text-slate-500 mt-1">Gérez vos espaces pour l'organisation des sessions inter et intra.</p>
+          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Salles de Formation</h1>
+          <p className="text-slate-500 mt-2 text-lg font-light">Gérez votre logistique et vos espaces de formation.</p>
         </div>
         <button 
           onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#a524eb] text-white rounded-xl shadow-lg shadow-purple-200 hover:bg-[#821bc1] transition-all"
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#a524eb] to-[#7c1dc2] text-white rounded-2xl shadow-xl shadow-purple-200 hover:shadow-purple-300 hover:-translate-y-0.5 transition-all font-medium active:scale-95"
         >
           <Plus size={20} />
           <span>Ajouter une salle</span>
