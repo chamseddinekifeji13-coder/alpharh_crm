@@ -13,7 +13,7 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
   const customLogo = config?.company_logo_url;
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex items-center gap-3 ${className}`} style={{ maxHeight: size, overflow: 'hidden' }}>
       {/* Premium Logo Container */}
       <motion.div 
         whileHover={{ scale: 1.05, rotate: 2 }}
@@ -22,20 +22,22 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
           height: size, 
           width: customLogo ? 'auto' : size,
           maxWidth: size * 4,
+          minWidth: customLogo ? '60px' : size,
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          flexShrink: 0
+          flexShrink: 0,
+          overflow: 'hidden'
         }}
       >
         {customLogo ? (
-          /* Render uploaded company logo with flexible width */
-          <div className="h-full rounded-lg overflow-hidden bg-white/50 flex items-center justify-center p-1 border border-slate-100 shadow-sm transition-all">
+          /* Render uploaded company logo with flexible width but STRICT height */
+          <div style={{ height: size, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img 
               src={customLogo} 
               alt="Logo" 
-              className="h-full w-auto max-w-[200px] object-contain"
+              style={{ height: '100%', width: 'auto', maxWidth: '200px', objectFit: 'contain' }}
               onError={(e) => (e.currentTarget.style.display = 'none')} 
             />
           </div>
