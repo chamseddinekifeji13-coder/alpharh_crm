@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Interaction, TypeInteraction, StatutRelance, TYPE_INTERACTION_LABELS, Entreprise, Contact, Opportunite } from '../../types/crm.types';
 import { interactionService, entrepriseService, contactService, opportuniteService } from '../../utils/crmService';
+import { toast } from 'react-hot-toast';
 
 import '../../App.css';
 
@@ -224,18 +225,30 @@ const CrmInteractions = () => {
 
   const handleSave = async (data: Omit<Interaction, 'id' | 'created_at' | 'updated_at'>) => {
     setFormLoading(true);
-    if (editTarget) {
-      // interactionService.update missing in Supabase refactor? 
-      // Need check... Actually, I should probably add update to interactionService if I missed it.
-      // For now, assume it's created if no ID. Wait, I'll update it later if needed.
-      // Re-service check: I only added create and delete.
-    } else {
-      await interactionService.create(data);
+    try {
+      let success = false;
+      if (editTarget) {
+        // success = await interactionService.update(editTarget.id, data);
+        toast.error('La modification des interactions n\'est pas encore supportée.');
+      } else {
+        const res = await interactionService.create(data);
+        success = !!res;
+      }
+
+      if (success) {
+        toast.success('Interaction enregistrée !');
+        await fetchData();
+        setShowForm(false);
+        setEditTarget(null);
+      } else if (!editTarget) {
+        toast.error('Échec de l\'enregistrement de l\'interaction. Vérifiez que les champs obligatoires sont remplis.');
+      }
+    } catch (e) {
+      console.error('Error saving interaction:', e);
+      toast.error('Une erreur est survenue lors de l\'enregistrement.');
+    } finally {
+      setFormLoading(false);
     }
-    await fetchData();
-    setFormLoading(false);
-    setShowForm(false);
-    setEditTarget(null);
   };
 
   const handleDelete = async (id: string) => {

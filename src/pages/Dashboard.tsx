@@ -76,7 +76,7 @@ const Dashboard = () => {
     const erreurs = trainers.filter(t => t.extraction_statut === 'erreur_extraction').length;
 
     return [
-      { label: 'Total Formateurs', value: total.toString(), icon: Users, color: 'blue' },
+      { label: 'Total Formateurs', value: total.toString(), icon: Users, color: 'purple' },
       { label: 'Profils Validés', value: valides.toString(), icon: FileCheck, color: 'green' },
       { label: 'À Valider', value: aValider.toString(), icon: FileSignature, color: 'yellow' },
       { label: 'Erreurs / PDF', value: (pdfImportes + erreurs).toString(), icon: AlertCircle, color: 'red' },
@@ -87,7 +87,7 @@ const Dashboard = () => {
     const oppOuvertes = opportunites.filter(o => o.statut_opportunite === 'ouverte').length;
 
     return [
-      { label: 'Entreprises', value: entreprises.length.toString(), icon: Building2, color: 'indigo' },
+      { label: 'Entreprises', value: entreprises.length.toString(), icon: Building2, color: 'purple' },
       { label: 'Contacts CRM', value: contacts.length.toString(), icon: UserCircle2, color: 'purple' },
       { label: 'Opportunités', value: oppOuvertes.toString(), icon: Target, color: 'orange' },
       { label: 'Pipeline (DT)', value: montantTotal.toLocaleString(), icon: BadgeEuro, color: 'emerald' },
@@ -113,7 +113,7 @@ const Dashboard = () => {
       datasets: [
         {
           data: sortedLabels.map(l => counts[l]),
-          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'],
+          backgroundColor: ['#a524eb', '#10b981', '#f59e0b', '#ef4444', '#c05df1'],
           borderWidth: 0,
         },
       ],
@@ -138,7 +138,7 @@ const Dashboard = () => {
         {
           label: 'Nombre de formateurs',
           data: Object.values(counts),
-          backgroundColor: '#1e293b',
+          backgroundColor: '#a524eb',
           borderRadius: 8,
         },
       ],
@@ -151,9 +151,9 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>Alpha RH - Tableau de Bord</h1>
-        <p>Aperçu en temps réel de votre CVthèque et CRM (Supabase)</p>
+      <header className="dashboard-header mb-8">
+        <h1 style={{ fontWeight: 300, color: 'var(--primary)', fontSize: '2.2rem' }}>Tableau de Bord</h1>
+        <p className="text-slate-500">Aperçu en temps réel de votre activité Alpha RH</p>
       </header>
 
       <div className="stats-grid">
@@ -170,7 +170,7 @@ const Dashboard = () => {
               <stat.icon size={24} />
             </div>
             <div className="stat-info">
-              <h3>{stat.value}</h3>
+              <h3 style={{ fontWeight: 300 }}>{stat.value}</h3>
               <p>{stat.label}</p>
             </div>
           </motion.div>
@@ -195,7 +195,7 @@ const Dashboard = () => {
               <stat.icon size={24} />
             </div>
             <div className="stat-info">
-              <h3>{stat.value}</h3>
+              <h3 style={{ fontWeight: 500 }}>{stat.value}</h3>
               <p>{stat.label}</p>
             </div>
           </motion.div>

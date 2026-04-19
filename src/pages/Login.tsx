@@ -3,6 +3,7 @@ import { ShieldCheck, Lock, Mail, AlertTriangle, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../utils/supabaseClient';
 import { toast } from 'react-hot-toast';
+import Logo from '../components/common/Logo';
 
 import '../App.css';
 
@@ -31,6 +32,25 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error('Veuillez saisir votre adresse email pour réinitialiser le mot de passe.');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password',
+    });
+
+    if (error) {
+      toast.error('Erreur : ' + error.message);
+    } else {
+      toast.success('Un lien de réinitialisation a été envoyé à ' + email);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="login-page">
       <motion.div 
@@ -40,8 +60,8 @@ const Login = () => {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <div className="login-header">
-          <img src="/logo.png" alt="Alpha RH Logo" className="login-logo" />
-          <h2 className="crm-text-primary">Alpha RH CRM</h2>
+          <Logo size={60} className="mb-6 justify-center" />
+          <h2 className="crm-text-primary" style={{ color: '#a524eb', fontWeight: 500 }}>Alpha RH CRM</h2>
           <p className="crm-text-sm-muted">Système de gestion des talents et formations</p>
         </div>
 
@@ -75,7 +95,17 @@ const Login = () => {
           </div>
 
           <div className="login-form-group">
-            <label htmlFor="login-password">Mot de passe</label>
+            <div className="flex-between">
+              <label htmlFor="login-password">Mot de passe</label>
+              <button 
+                type="button" 
+                onClick={handleForgotPassword}
+                className="text-link text-xs"
+                disabled={loading}
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
             <div className="login-input-wrapper">
               <input 
                 id="login-password" 
@@ -93,7 +123,7 @@ const Login = () => {
 
           <button 
             type="submit" 
-            className="btn btn-secondary btn-pill btn-block btn-lg mt-3" 
+            className="btn btn-primary btn-pill btn-block btn-lg mt-3" 
             disabled={loading}
           >
             {loading ? 'Connexion en cours...' : (

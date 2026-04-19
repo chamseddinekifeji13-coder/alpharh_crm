@@ -14,6 +14,7 @@ import {
   X,
   Menu
 } from 'lucide-react';
+import Logo from './common/Logo';
 
 import '../App.css';
 
@@ -29,14 +30,10 @@ const Sidebar = ({ onLogout, isOpen, onClose }: SidebarProps) => {
   const { config } = useConfig();
 
   return (
-    <aside className={`sidebar dark-glass ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-header-top">
-          <img 
-            src={config?.company_logo_url || '/logo.png'} 
-            alt="Company Logo" 
-            className="sidebar-logo" 
-          />
+          <Logo size={42} />
           {/* Mobile Close Button */}
           <button 
             className="sidebar-close-mobile" 
@@ -47,11 +44,13 @@ const Sidebar = ({ onLogout, isOpen, onClose }: SidebarProps) => {
             <X size={24} />
           </button>
         </div>
-        <div className="sidebar-brand">
-          <h2>{config?.company_name || 'Alpha RH'}</h2>
-          <span className="sidebar-badge">CRM Cloud</span>
-        </div>
-        <p className="sidebar-subtitle">CVthèque & CRM</p>
+        {!config?.company_logo_url && (
+          <div className="sidebar-brand">
+            <h2>{config?.company_name || 'Alpha RH'}</h2>
+            <span className="sidebar-badge">CRM Cloud</span>
+          </div>
+        )}
+        <p className="sidebar-subtitle">Système de Gestion</p>
       </div>
 
       <nav className="sidebar-nav">

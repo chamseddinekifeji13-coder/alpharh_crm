@@ -24,8 +24,8 @@ const getSuggestedTrainersAsync = async (theme: string, domaine: string) => {
   const trainers = await dbService.getAll();
   const scored = trainers.map(t => {
     let score = 0;
-    const th = theme.toLowerCase();
-    const dom = domaine.toLowerCase();
+    const th = (theme || '').toLowerCase();
+    const dom = (domaine || '').toLowerCase();
 
     // Matching de base (domaines et thèmes)
     if (dom && t.domaines_couverts?.toLowerCase().includes(dom)) score += 5;
@@ -90,7 +90,17 @@ interface OppFormProps {
 const OppForm = ({ initial, onSave, onClose, loading }: OppFormProps) => {
   const navigate = useNavigate();
   const [form, setForm] = useState(
-    initial ? { ...initial } as Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>
+    initial ? { 
+      ...initial,
+      entreprise_id: initial.entreprise_id || '',
+      contact_id: initial.contact_id || '',
+      theme_programme: initial.theme_programme || '',
+      domaine_formation: initial.domaine_formation || '',
+      besoin_detaille: initial.besoin_detaille || '',
+      prochaine_action: initial.prochaine_action || '',
+      date_prochaine_action: initial.date_prochaine_action || '',
+      responsable_commercial: initial.responsable_commercial || '',
+    } as Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>
     : emptyForm()
   );
   const set = (k: string, v: string | number) => setForm(f => ({ ...f, [k]: v }));
@@ -152,13 +162,13 @@ const OppForm = ({ initial, onSave, onClose, loading }: OppFormProps) => {
               <div className="rh-section-header">CRITÈRES & PRIORITÉ</div>
               <div className="col-span-3 form-group">
                 <label>Étape pipeline</label>
-                <select aria-label="Étape du pipeline" value={form.etape_pipeline} onChange={e => set('etape_pipeline', e.target.value as EtapePipeline)} disabled={loading}>
+                <select aria-label="Étape du pipeline" value={form.etape_pipeline || 'prospection'} onChange={e => set('etape_pipeline', e.target.value as EtapePipeline)} disabled={loading}>
                   {PIPELINE_STAGES.map(s => <option key={s} value={s}>{ETAPE_LABELS[s]}</option>)}
                 </select>
               </div>
               <div className="col-span-3 form-group">
                 <label>Priorité</label>
-                <select aria-label="Niveau de priorité" value={form.priorite} onChange={e => set('priorite', e.target.value as any)} disabled={loading}>
+                <select aria-label="Niveau de priorité" value={form.priorite || 'moyenne'} onChange={e => set('priorite', e.target.value as any)} disabled={loading}>
                   <option value="haute">🔴 Haute / Urgent</option>
                   <option value="moyenne">🟡 Moyenne</option>
                   <option value="faible">🟢 Faible</option>
@@ -168,7 +178,7 @@ const OppForm = ({ initial, onSave, onClose, loading }: OppFormProps) => {
               <div className="rh-section-header">CLIENT & CONTACT</div>
               <div className="col-span-6 form-group">
                 <label>Entreprise *</label>
-                <select aria-label="Sélectionner l'entreprise" value={form.entreprise_id} onChange={e => set('entreprise_id', e.target.value)} disabled={loading}>
+                <select aria-label="Sélectionner l'entreprise" value={form.entreprise_id || ''} onChange={e => set('entreprise_id', e.target.value)} disabled={loading}>
                   <option value="">— Choisir —</option>
                   {entreprises.map(e => <option key={e.id} value={e.id}>{e.raison_sociale}</option>)}
                 </select>
@@ -188,13 +198,13 @@ const OppForm = ({ initial, onSave, onClose, loading }: OppFormProps) => {
               <div className="rh-section-header">DÉTAILS PÉDAGOGIQUES</div>
               <div className="col-span-3 form-group">
                 <label>Type d'opportunité</label>
-                <select aria-label="Type d'opportunité" value={form.type_opportunite} onChange={e => set('type_opportunite', e.target.value as TypeOpportunite)} disabled={loading}>
+                <select aria-label="Type d'opportunité" value={form.type_opportunite || 'intra'} onChange={e => set('type_opportunite', e.target.value as TypeOpportunite)} disabled={loading}>
                   {Object.entries(TYPE_OPPORTUNITE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
               <div className="col-span-3 form-group">
                 <label>Domaine de formation</label>
-                <select aria-label="Domaine de formation" value={form.domaine_formation} onChange={e => set('domaine_formation', e.target.value)} disabled={loading}>
+                <select aria-label="Domaine de formation" value={form.domaine_formation || ''} onChange={e => set('domaine_formation', e.target.value)} disabled={loading}>
                   <option value="">— Choisir —</option>
                   {DOMAINES.map(d => <option key={d}>{d}</option>)}
                 </select>
@@ -206,7 +216,7 @@ const OppForm = ({ initial, onSave, onClose, loading }: OppFormProps) => {
               </div>
               <div className="col-span-6 form-group">
                 <label>Besoin détaillé</label>
-                <textarea value={form.besoin_detaille} onChange={e => set('besoin_detaille', e.target.value)}
+                <textarea value={form.besoin_detaille || ''} onChange={e => set('besoin_detaille', e.target.value)}
                   rows={2} placeholder="Décrivez le besoin..." disabled={loading} />
               </div>
 
@@ -426,8 +436,8 @@ const PipelineView = ({ opportunites, entreprises, onEdit, onRefresh }: Pipeline
                               → {ETAPE_LABELS[s]}
                             </button>
                           ))}
-                            <button onClick={() => onEdit(o)} className="crm-pipeline-edit-btn" title="Détails" aria-label="Détails"><Edit2 size={10} /></button>
-                            <button onClick={() => handleDelete(o.id)} className="crm-pipeline-del-btn" title="Supprimer" aria-label="Supprimer"><Trash2 size={10} /></button>
+                            <button onClick={() => onEdit(o)} className="crm-pipeline-edit-btn" title="Détails" aria-label="Détails"><Edit2 size={14} /></button>
+                            <button onClick={() => handleDelete(o.id)} className="crm-pipeline-del-btn" title="Supprimer" aria-label="Supprimer"><Trash2 size={14} /></button>
                         </div>
                       </motion.div>
                     );
@@ -499,15 +509,30 @@ const CrmOpportunites = () => {
 
   const handleSave = async (data: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>) => {
     setFormLoading(true);
-    if (editTarget) {
-      await opportuniteService.update(editTarget.id, data);
-    } else {
-      await opportuniteService.create(data);
+    let success = false;
+    
+    try {
+      if (editTarget) {
+        success = await opportuniteService.update(editTarget.id, data);
+      } else {
+        const res = await opportuniteService.create(data);
+        success = !!res;
+      }
+
+      if (success) {
+        toast.success(editTarget ? 'Opportunité mise à jour' : 'Nouvelle opportunité enregistrée !');
+        await fetchData();
+        setShowForm(false);
+        setEditTarget(null);
+      } else {
+        toast.error('Échec de l\'enregistrement. Il est possible que des colonnes manquent dans la base de données ou que les données soient invalides.');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Une erreur inattendue est survenue.');
+    } finally {
+      setFormLoading(false);
     }
-    await fetchData();
-    setFormLoading(false);
-    setShowForm(false);
-    setEditTarget(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -522,7 +547,7 @@ const CrmOpportunites = () => {
       <div className="crm-page-header">
         <div>
           <h1 className="crm-page-title">
-            <Target size={28} color="#d4af37" /> Opportunités
+            <Target size={28} color="var(--primary)" /> Opportunités
           </h1>
           <p className="crm-page-subtitle">{loading ? 'Chargement...' : `${stats.ouvertes} opportunité(s) ouvertes`}</p>
         </div>
@@ -543,9 +568,9 @@ const CrmOpportunites = () => {
 
       <div className="crm-stats-grid">
         {[
-          { label: 'Ouvertes', val: stats.ouvertes, colorName: 'blue', icon: <Target size={20} /> },
+          { label: 'Ouvertes', val: stats.ouvertes, colorName: 'purple', icon: <Target size={20} /> },
           { label: 'CA Potentiel', val: `${stats.montantBrut.toLocaleString()} DT`, colorName: 'gold', icon: <TrendingUp size={20} /> },
-          { label: 'CA Pondéré', val: `${Math.round(stats.montantPondere).toLocaleString()} DT`, colorName: 'indigo', icon: <TrendingUp size={20} /> },
+          { label: 'CA Pondéré', val: `${Math.round(stats.montantPondere).toLocaleString()} DT`, colorName: 'purple', icon: <TrendingUp size={20} /> },
           { label: 'Transformation', val: `${stats.transformationRate}%`, colorName: 'green', icon: <ChevronRight size={20} /> },
         ].map(s => (
           <div key={s.label} className="crm-stat-card">

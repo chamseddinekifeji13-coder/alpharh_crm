@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../utils/supabaseClient';
 import { 
   Download, 
   Upload, 
@@ -40,6 +41,8 @@ const Settings = () => {
     quote_prefix: 'D-',
     accent_color: '#2563eb'
   });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (config) {
@@ -67,6 +70,44 @@ const Settings = () => {
     } else {
       toast.error('Erreur lors de l\'enregistrement');
     }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `company_logo_${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `branding/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(filePath, file, { 
+          cacheControl: '3600',
+          upsert: true 
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('logos')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, company_logo_url: publicUrl }));
+      toast.success('Logo téléchargé ! Cliquez sur Enregistrer pour confirmer.');
+    } catch (err: any) {
+      console.error('Logo upload error:', err);
+      toast.error('Échec de l\'envoi du logo. Assurez-vous que le bucket "logos" existe dans Supabase.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setFormData(prev => ({ ...prev, company_logo_url: '' }));
+    toast.success('Logo supprimé localement. Enregistrez pour confirmer.');
   };
 
   const handleExport = async () => {
@@ -164,16 +205,43 @@ const Settings = () => {
                     />
                   </div>
                   <div className="form-group col-span-2">
-                    <label htmlFor="comp-logo">URL du Logo (Image PNG/JPG)</label>
-                    <div className="flex gap-4 items-center">
-                      <input 
-                        id="comp-logo"
-                        value={formData.company_logo_url} 
-                        onChange={e => setFormData({...formData, company_logo_url: e.target.value})}
-                        placeholder="https://votre-site.com/logo.png"
-                      />
-                      <div className="logo-preview-box">
-                        <img src={formData.company_logo_url || '/logo.png'} alt="Preview" onError={(e) => (e.currentTarget.src = '/logo.png')} />
+                    <label>Logo de l'entreprise</label>
+                    <div className="flex gap-6 items-center bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">
+                      <div className="logo-preview-box-large">
+                        <img 
+                          src={formData.company_logo_url || '/logo.png'} 
+                          alt="Company Logo" 
+                          onError={(e) => (e.currentTarget.src = 'https://placehold.co/100x100?text=Logo')} 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <button 
+                            type="button" 
+                            className="btn btn-outline btn-sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploading}
+                          >
+                            <Upload size={14} /> {uploading ? 'Envoi...' : 'Choisir un fichier'}
+                          </button>
+                          {formData.company_logo_url && (
+                            <button 
+                              type="button" 
+                              className="btn btn-outline btn-danger-md btn-sm"
+                              onClick={handleRemoveLogo}
+                            >
+                              <Trash2 size={14} /> Supprimer
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">PNG, JPG ou SVG conseillé (Max 2Mo)</p>
+                        <input 
+                          type="file" 
+                          ref={fileInputRef}
+                          onChange={handleLogoUpload}
+                          style={{ display: 'none' }}
+                          accept="image/*"
+                        />
                       </div>
                     </div>
                   </div>
@@ -303,7 +371,8 @@ const Settings = () => {
         .settings-tab-btn.active { background: var(--primary-color); color: white; box-shadow: 0 4px 12px var(--primary-soft); }
         .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
         .logo-preview-box { width: 44px; height: 44px; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f8fafc; }
-        .logo-preview-box img { max-width: 80%; max-height: 80%; object-fit: contain; }
+        .logo-preview-box-large { width: 80px; height: 80px; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .logo-preview-box img, .logo-preview-box-large img { max-width: 85%; max-height: 85%; object-fit: contain; }
         .color-picker-input { width: 44px; height: 44px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0; cursor: pointer; }
         .info-alert { display: flex; gap: 0.75rem; padding: 1rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.75rem; color: #1e40af; font-size: 0.85rem; }
         .settings-action-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid #f1f5f9; }

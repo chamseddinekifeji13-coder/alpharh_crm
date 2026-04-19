@@ -104,13 +104,25 @@ export const dbService = {
 
   // Save or Update formateur
   save: async (formateur: Partial<Formateur>): Promise<Formateur | null> => {
-    // Extract nested data (saved separately in future versions)
-    const { autorisations, formations_base, formations_complementaires, experiences_professionnelles, experiences_formation, ...parentData } = formateur as any;
+    // Extract nested data and internal fields (saved separately or managed by DB)
+    const { 
+      autorisations, 
+      formations_base, 
+      formations_complementaires, 
+      experiences_professionnelles, 
+      experiences_formation,
+      trainer_formations,
+      trainer_experiences,
+      id,
+      created_at,
+      ...parentData 
+    } = formateur as any;
 
-    if (!parentData.id || parentData.id.length < 10) delete parentData.id;
+    const payload: any = { ...parentData };
+    if (id && id.length >= 10) payload.id = id;
 
     // Sanitization to avoid invalid dates/numbers
-    const sanitized = sanitizeData(parentData);
+    const sanitized = sanitizeData(payload);
 
     const { data, error } = await supabase
       .from('trainers')

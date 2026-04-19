@@ -8,8 +8,12 @@
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
-  color: white;
+  background-color: #ffffff;
+  color: var(--primary);
   overflow-y: auto;
+  border-right: 1px solid rgba(165, 36, 235, 0.1);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+  z-index: 1000;
 }
 
 /* Custom Scrollbar for Sidebar */
@@ -22,20 +26,28 @@
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(165, 36, 235, 0.1);
   border-radius: 10px;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(165, 36, 235, 0.2);
 }
 
 .sidebar-header {
-  margin-bottom: 3rem;
+  margin-bottom: 2.5rem;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.sidebar-header-top {
+  display: flex;
   align-items: center;
-  text-align: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 1.5rem;
 }
 
 .sidebar-logo {
@@ -46,11 +58,11 @@
 }
 
 .sidebar-brand h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: white;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--primary);
   margin: 0;
-  letter-spacing: 1px;
+  letter-spacing: -0.5px;
 }
 
 .sidebar-badge {
@@ -59,7 +71,7 @@
   color: var(--primary);
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   margin-top: 0.25rem;
 }
@@ -85,13 +97,14 @@
   gap: 1rem;
   padding: 0.875rem 1.25rem;
   border-radius: 12px;
-  color: #cbd5e1;
-  transition: all 0.2s;
+  color: #64748b; /* Slate 500 for neutral */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  font-weight: 500;
 }
 
 /* Dynamic Colors for Stat Cards (replacing inline styles) */
-.stat-card[data-color="blue"] .stat-icon { background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.stat-card[data-color="blue"] .stat-icon { background-color: rgba(165, 36, 235, 0.15); color: #a524eb; } /* Purple accent instead of Blue */
 .stat-card[data-color="green"] .stat-icon { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
 .stat-card[data-color="yellow"] .stat-icon { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
 .stat-card[data-color="indigo"] .stat-icon { background-color: rgba(99, 102, 241, 0.15); color: #6366f1; }
@@ -312,14 +325,16 @@
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
+  background: rgba(165, 36, 235, 0.06);
+  color: var(--primary);
+  transform: translateX(4px);
 }
 
 .nav-item.active {
-  background: var(--secondary);
+  background: rgba(165, 36, 235, 0.1);
   color: var(--primary);
-  font-weight: 600;
+  font-weight: 500;
+  box-shadow: inset 4px 0 0 -1px var(--primary);
 }
 
 .sidebar-footer {
@@ -1049,36 +1064,36 @@
 
 /* CRM Opportunity Stage Classes */
 .crm-bg-identification     { background-color: #94a3b8; }
-.crm-bg-qualification      { background-color: #6366f1; }
-.crm-bg-proposition        { background-color: #3b82f6; }
+.crm-bg-qualification      { background-color: #c05df1; }
+.crm-bg-proposition        { background-color: #a524eb; }
 .crm-bg-negociation        { background-color: #f59e0b; }
 .crm-bg-cloture_gagnee     { background-color: #10b981; }
 .crm-bg-cloture_perdue     { background-color: #ef4444; }
 
 .crm-border-identification { border-left-color: #94a3b8; }
-.crm-border-qualification  { border-left-color: #6366f1; }
-.crm-border-proposition    { border-left-color: #3b82f6; }
+.crm-border-qualification  { border-left-color: #c05df1; }
+.crm-border-proposition    { border-left-color: #a524eb; }
 .crm-border-negociation    { border-left-color: #f59e0b; }
 .crm-border-cloture_gagnee { border-left-color: #10b981; }
 .crm-border-cloture_perdue { border-left-color: #ef4444; }
 
 .crm-tag-identification    { background-color: #94a3b822; color: #64748b; }
-.crm-tag-qualification     { background-color: #6366f122; color: #6366f1; }
-.crm-tag-proposition       { background-color: #3b82f622; color: #3b82f6; }
+.crm-tag-qualification     { background-color: rgba(192, 93, 241, 0.1); color: #c05df1; }
+.crm-tag-proposition       { background-color: rgba(165, 36, 235, 0.1); color: #a524eb; }
 .crm-tag-negociation       { background-color: #f59e0b22; color: #f59e0b; }
 .crm-tag-cloture_gagnee    { background-color: #10b98122; color: #10b981; }
 .crm-tag-cloture_perdue    { background-color: #ef444422; color: #ef4444; }
 
 /* Dashboard Icon Backgrounds */
-.crm-icon-indigo { background-color: #6366f115; color: #6366f1; }
-.crm-icon-blue   { background-color: #3b82f615; color: #3b82f6; }
+.crm-icon-indigo { background-color: rgba(192, 93, 241, 0.1); color: #c05df1; }
+.crm-icon-blue   { background-color: rgba(165, 36, 235, 0.1); color: #a524eb; }
 .crm-icon-gold   { background-color: #d4af3715; color: #d4af37; }
 .crm-icon-green  { background-color: #10b98115; color: #10b981; }
 
 /* CRM Pipeline Move Buttons */
 .crm-pipeline-move-btn.crm-move-identification { border-color: #94a3b844; color: #94a3b8; background: #94a3b811; }
-.crm-pipeline-move-btn.crm-move-qualification  { border-color: #6366f144; color: #6366f1; background: #6366f111; }
-.crm-pipeline-move-btn.crm-move-proposition    { border-color: #3b82f644; color: #3b82f6; background: #3b82f611; }
+.crm-pipeline-move-btn.crm-move-qualification  { border-color: rgba(192, 93, 241, 0.2); color: #c05df1; background: rgba(192, 93, 241, 0.05); }
+.crm-pipeline-move-btn.crm-move-proposition    { border-color: rgba(165, 36, 235, 0.2); color: #a524eb; background: rgba(165, 36, 235, 0.05); }
 .crm-pipeline-move-btn.crm-move-negociation    { border-color: #f59e0b44; color: #f59e0b; background: #f59e0b11; }
 .crm-pipeline-move-btn.crm-move-cloture_gagnee { border-color: #10b98144; color: #10b981; background: #10b98111; }
 .crm-pipeline-move-btn.crm-move-cloture_perdue { border-color: #ef444444; color: #ef4444; background: #ef444411; }
@@ -1812,7 +1827,7 @@
 .text-success { color: #166534 !important; }
 .text-warning { color: #854d0e !important; }
 .text-danger  { color: #991b1b !important; }
-.text-info    { color: #075985 !important; }
+.text-info    { color: #9C27B0 !important; }
 
 .sf-suivi-label-mb {
   margin-bottom: 0.5rem;
@@ -2206,7 +2221,7 @@
 
 .crm-fiche-header-premium {
   padding: 1.5rem;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
   color: white;
   display: flex;
   align-items: center;

@@ -131,7 +131,7 @@ export const ETAPE_LABELS: Record<EtapePipeline, string> = {
 
 export const ETAPE_COLORS: Record<EtapePipeline, string> = {
   prospection: '#8b5cf6',
-  qualification: '#3b82f6',
+  qualification: '#9C27B0',
   proposition: '#f59e0b',
   negociation: '#f97316',
   gagnee: '#10b981',
@@ -236,7 +236,7 @@ export const STATUT_DEVIS_LABELS: Record<StatutDevis, string> = {
 
 export const STATUT_DEVIS_COLORS: Record<StatutDevis, string> = {
   brouillon: '#6b7280', // Gray
-  envoye: '#3b82f6',    // Blue
+  envoye: '#9C27B0',    // Violet
   accepte: '#10b981',   // Green
   refuse: '#ef4444',    // Red
   expire: '#9ca3af',    // Light Gray

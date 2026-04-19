@@ -9,6 +9,22 @@ import { supabase } from './supabaseClient';
 
 const now = () => new Date().toISOString();
 
+const sanitizeData = <T extends object>(data: T): T => {
+  const sanitized = { ...data } as any;
+  Object.keys(sanitized).forEach(key => {
+    const val = sanitized[key];
+    // Convertit les chaînes vides, les chaînes d'espaces, undefined et NaN en null
+    if (
+      val === undefined || 
+      (typeof val === 'string' && val.trim() === '') || 
+      (typeof val === 'number' && isNaN(val))
+    ) {
+      sanitized[key] = null;
+    }
+  });
+  return sanitized;
+};
+
 // ─── Entreprises ──────────────────────────────────────────────────────────────
 
 export const entrepriseService = {
@@ -52,19 +68,24 @@ export const entrepriseService = {
   },
 
   create: async (data: Omit<Entreprise, 'id' | 'created_at' | 'updated_at'>): Promise<Entreprise | null> => {
+    const sanitized = sanitizeData(data);
     const { data: record, error } = await supabase
       .from('entreprises')
-      .insert({ ...data, updated_at: now() })
+      .insert({ ...sanitized, updated_at: now() })
       .select()
       .single();
-    if (error) { console.error(error); return null; }
+    if (error) { console.error('Erreur Supabase (Création Entreprise):', error); return null; }
     return record;
   },
 
   update: async (id: string, data: Partial<Entreprise>): Promise<boolean> => {
+    const sanitized = sanitizeData(data);
+    // Supprimer les colonnes système pour éviter les conflits
+    const { id: _id, created_at: _ca, updated_at: _ua, ...updateData } = sanitized as any;
+
     const { error } = await supabase
       .from('entreprises')
-      .update({ ...data, updated_at: now() })
+      .update({ ...updateData, updated_at: now() })
       .eq('id', id);
     return !error;
   },
@@ -110,19 +131,23 @@ export const contactService = {
   },
 
   create: async (data: Omit<Contact, 'id' | 'created_at' | 'updated_at'>): Promise<Contact | null> => {
+    const sanitized = sanitizeData(data);
     const { data: record, error } = await supabase
       .from('contacts')
-      .insert({ ...data, updated_at: now() })
+      .insert({ ...sanitized, updated_at: now() })
       .select()
       .single();
-    if (error) { console.error(error); return null; }
+    if (error) { console.error('Erreur Supabase (Création Contact):', error); return null; }
     return record;
   },
 
   update: async (id: string, data: Partial<Contact>): Promise<boolean> => {
+    const sanitized = sanitizeData(data);
+    const { id: _id, created_at: _ca, updated_at: _ua, ...updateData } = sanitized as any;
+
     const { error } = await supabase
       .from('contacts')
-      .update({ ...data, updated_at: now() })
+      .update({ ...updateData, updated_at: now() })
       .eq('id', id);
     return !error;
   },
@@ -166,20 +191,34 @@ export const opportuniteService = {
   },
 
   create: async (data: Omit<Opportunite, 'id' | 'created_at' | 'updated_at'>): Promise<Opportunite | null> => {
-    const { data: record, error } = await supabase
-      .from('opportunites')
-      .insert({ ...data, updated_at: now() })
-      .select()
-      .single();
-    if (error) { console.error(error); return null; }
-    return record;
+    try {
+      const sanitized = sanitizeData(data);
+      const { data: record, error } = await supabase
+        .from('opportunites')
+        .insert({ ...sanitized, updated_at: now() })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erreur Supabase (Création Opportunité):', error.message, error.details, error.hint);
+        return null;
+      }
+      return record;
+    } catch (e) {
+      console.error('Erreur inattendue (Création Opportunité):', e);
+      return null;
+    }
   },
 
   update: async (id: string, data: Partial<Opportunite>): Promise<boolean> => {
+    const sanitized = sanitizeData(data);
+    const { id: _id, created_at: _ca, updated_at: _ua, ...updateData } = sanitized as any;
+
     const { error } = await supabase
       .from('opportunites')
-      .update({ ...data, updated_at: now() })
+      .update({ ...updateData, updated_at: now() })
       .eq('id', id);
+    if (error) console.error('Erreur Supabase (Mise à jour Opportunité):', error);
     return !error;
   },
 
@@ -209,13 +248,23 @@ export const interactionService = {
   },
 
   create: async (data: Omit<Interaction, 'id' | 'created_at' | 'updated_at'>): Promise<Interaction | null> => {
-    const { data: record, error } = await supabase
-      .from('interactions')
-      .insert({ ...data, updated_at: now() })
-      .select()
-      .single();
-    if (error) { console.error(error); return null; }
-    return record;
+    try {
+      const sanitized = sanitizeData(data);
+      const { data: record, error } = await supabase
+        .from('interactions')
+        .insert({ ...sanitized, updated_at: now() })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erreur Supabase (Création Interaction):', error.message, error.details, error.hint);
+        return null;
+      }
+      return record;
+    } catch (e) {
+      console.error('Erreur inattendue (Création Interaction):', e);
+      return null;
+    }
   },
 
   delete: async (id: string): Promise<boolean> => {
