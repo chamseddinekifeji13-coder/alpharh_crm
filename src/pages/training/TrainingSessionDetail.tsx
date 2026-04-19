@@ -234,7 +234,6 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
     });
     onUpdate();
   };
-Line:235: 
 
   const handleDelete = async (id: string) => {
     if (confirm('Désinscrire ce participant ?')) {
