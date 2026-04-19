@@ -12,7 +12,9 @@ import {
   UserCircle2,
   FileText,
   X,
-  Menu
+  Menu,
+  GraduationCap,
+  DoorOpen
 } from 'lucide-react';
 import Logo from './common/Logo';
 
@@ -102,6 +104,21 @@ const Sidebar = ({ onLogout, isOpen, onClose }: SidebarProps) => {
         <NavLink to="/crm/devis" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <FileText size={20} />
           <span>Devis & Propositions</span>
+        </NavLink>
+
+        {/* ─── Gestion Formation ─── */}
+        <div className="sidebar-separator-crm">
+          GESTION FORMATION
+        </div>
+
+        <NavLink to="/training/sessions" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <GraduationCap size={20} />
+          <span>Sessions Inter</span>
+        </NavLink>
+
+        <NavLink to="/training/rooms" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <DoorOpen size={20} />
+          <span>Salles de cours</span>
         </NavLink>
       </nav>
 

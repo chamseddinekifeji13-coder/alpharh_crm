@@ -14,6 +14,9 @@ import CrmOpportunites from './pages/crm/CrmOpportunites';
 import CrmInteractions from './pages/crm/CrmInteractions';
 import CrmDevis from './pages/crm/CrmDevis';
 import Settings from './pages/Settings';
+import TrainingSessionList from './pages/training/TrainingSessionList';
+import TrainingRoomList from './pages/training/TrainingRoomList';
+import TrainingSessionDetail from './pages/training/TrainingSessionDetail';
 import { useState, useEffect } from 'react';
 import { supabase } from './utils/supabaseClient';
 import { Session } from '@supabase/supabase-js';
@@ -115,6 +118,11 @@ function App() {
           <Route path="/crm/interactions" element={<ProtectedLayout><CrmInteractions /></ProtectedLayout>} />
           <Route path="/crm/devis" element={<ProtectedLayout><CrmDevis /></ProtectedLayout>} />
           <Route path="/settings" element={<ProtectedLayout><Settings /></ProtectedLayout>} />
+          
+          {/* ─── GESTION FORMATION ─── */}
+          <Route path="/training/sessions" element={<ProtectedLayout><TrainingSessionList /></ProtectedLayout>} />
+          <Route path="/training/sessions/:id" element={<ProtectedLayout><TrainingSessionDetail /></ProtectedLayout>} />
+          <Route path="/training/rooms" element={<ProtectedLayout><TrainingRoomList /></ProtectedLayout>} />
 
           {/* Catch-all redirection */}
           <Route path="*" element={<Navigate to="/" replace />} />
