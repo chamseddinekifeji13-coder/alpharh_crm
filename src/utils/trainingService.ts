@@ -21,6 +21,15 @@ export const trainingService = {
     return data || [];
   },
 
+  getTrainers: async (): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('id, nom, prenom')
+      .order('nom');
+    if (error) return [];
+    return data || [];
+  },
+
   createRoom: async (room: Omit<TrainingRoom, 'id' | 'created_at' | 'updated_at'>): Promise<TrainingRoom | null> => {
     const { data, error } = await supabase
       .from('training_rooms')
