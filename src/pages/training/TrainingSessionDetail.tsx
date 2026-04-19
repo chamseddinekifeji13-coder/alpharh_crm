@@ -25,6 +25,9 @@ import {
   TrainingSession, 
   TrainingRegistration, 
   TrainingCost,
+  SessionStatus,
+  RegistrationStatus,
+  CostType,
   SESSION_STATUS_LABELS,
   REGISTRATION_STATUS_LABELS,
   COST_TYPE_LABELS
@@ -83,6 +86,7 @@ const TrainingSessionDetail = () => {
         <button 
           onClick={() => navigate('/training/sessions')}
           className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all"
+          title="Retour au catalogue"
         >
           <ArrowLeft size={20} />
         </button>
@@ -283,6 +287,7 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
             <div className="space-y-1">
               <label className="text-sm font-medium">Entreprise</label>
               <select 
+                title="Sélectionner une entreprise"
                 required
                 className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.entreprise_id}
@@ -295,6 +300,7 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
             <div className="space-y-1">
               <label className="text-sm font-medium">Contact (Référent)</label>
               <select 
+                title="Sélectionner un contact"
                 className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.contact_id}
                 onChange={e => setFormData({...formData, contact_id: e.target.value})}
@@ -308,6 +314,7 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
             <div className="space-y-1">
               <label className="text-sm font-medium">Prix Négocié (TND)</label>
               <input 
+                title="Prix négocié"
                 type="number"
                 className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl"
                 value={formData.negotiated_price}
@@ -373,6 +380,7 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
                   <button 
                     onClick={() => handleDelete(reg.id)}
                     className="p-2 text-slate-300 hover:text-red-500 rounded-lg transition-all"
+                    title="Désinscrire ce participant"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -399,7 +407,11 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
     e.preventDefault();
     if (!newCost.amount || !newCost.description) return;
     
-    await trainingService.addCost({ ...newCost, session_id: sessionId });
+    await trainingService.addCost({ 
+      ...newCost, 
+      session_id: sessionId,
+      type: newCost.type as CostType
+    });
     // Reset state but KEEP form open for multiple additions
     setNewCost({ type: 'other', amount: 0, description: '' });
     onUpdate();
@@ -436,6 +448,7 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
             <div className="bg-slate-50 p-4 rounded-2xl mb-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <select 
+                  title="Catégorie de dépense"
                   className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm"
                   value={newCost.type}
                   onChange={e => setNewCost({...newCost, type: e.target.value})}
@@ -538,7 +551,8 @@ const DocumentsManager = ({ session, participants, config }: any) => {
                 </div>
                 <button 
                   onClick={() => trainingDocGenerator.generateConvocation(session, p, config)}
-                  className="p-2 text-[#a524eb] hover:bg-purple-50 rounded-lg"
+                  className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                  aria-label="Télécharger la convocation"
                 >
                   <Download size={16} />
                 </button>
@@ -562,7 +576,11 @@ const DocCard = ({ title, description, onDownload }: any) => (
         <p className="text-sm text-slate-500 max-w-xs">{description}</p>
       </div>
     </div>
-    <button onClick={onDownload} className="p-3 bg-slate-100 rounded-2xl text-slate-600 hover:bg-[#a524eb] hover:text-white transition-all">
+    <button 
+      onClick={onDownload} 
+      className="p-3 bg-slate-100 rounded-2xl text-slate-600 hover:bg-[#a524eb] hover:text-white transition-all"
+      title="Télécharger"
+    >
       <Download size={20} />
     </button>
   </div>

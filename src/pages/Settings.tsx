@@ -236,10 +236,11 @@ const Settings = () => {
                         </div>
                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">PNG, JPG ou SVG conseillé (Max 2Mo)</p>
                         <input 
+                          title="Fichier logo"
                           type="file" 
                           ref={fileInputRef}
                           onChange={handleLogoUpload}
-                          style={{ display: 'none' }}
+                          className="hidden"
                           accept="image/*"
                         />
                       </div>

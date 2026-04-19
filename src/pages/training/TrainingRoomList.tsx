@@ -91,6 +91,7 @@ const TrainingRoomList = () => {
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">Capacité</label>
               <input 
+                title="Capacité de la salle"
                 type="number" 
                 value={newRoom.capacity}
                 onChange={e => setNewRoom({...newRoom, capacity: parseInt(e.target.value)})}
@@ -100,6 +101,7 @@ const TrainingRoomList = () => {
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">Coût journalier (TND)</label>
               <input 
+                title="Coût journalier de location"
                 type="number" 
                 value={newRoom.rental_cost_per_day}
                 onChange={e => setNewRoom({...newRoom, rental_cost_per_day: parseFloat(e.target.value)})}

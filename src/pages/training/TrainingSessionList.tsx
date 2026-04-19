@@ -105,7 +105,11 @@ const TrainingSessionList = () => {
                   <Target size={22} className="text-[#a524eb]" />
                   Nouvelle Action de Formation
                 </h2>
-                <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-slate-600">
+                <button 
+                  onClick={() => setShowAdd(false)} 
+                  className="text-slate-400 hover:text-slate-600"
+                  title="Fermer le formulaire"
+                >
                   <X size={24} />
                 </button>
               </div>
@@ -136,6 +140,7 @@ const TrainingSessionList = () => {
                     <Calendar size={14} /> Début
                   </label>
                   <input 
+                    title="Date de début"
                     type="date" required
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-purple-100 focus:bg-white transition-all"
                     value={formData.date_start}
@@ -147,6 +152,7 @@ const TrainingSessionList = () => {
                     <Calendar size={14} /> Fin
                   </label>
                   <input 
+                    title="Date de fin"
                     type="date" required
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-purple-100 focus:bg-white transition-all"
                     value={formData.date_end}
@@ -156,6 +162,7 @@ const TrainingSessionList = () => {
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">Formateur</label>
                   <select 
+                    title="Sélectionner un formateur"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-purple-100 focus:bg-white transition-all"
                     value={formData.trainer_id}
                     onChange={e => setFormData({...formData, trainer_id: e.target.value})}
@@ -167,6 +174,7 @@ const TrainingSessionList = () => {
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">Salle</label>
                   <select 
+                    title="Sélectionner une salle"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-purple-100 focus:bg-white transition-all"
                     value={formData.room_id}
                     onChange={e => setFormData({...formData, room_id: e.target.value})}
@@ -181,6 +189,7 @@ const TrainingSessionList = () => {
                     Prix catalogue par participant (TND)
                   </label>
                   <input 
+                    title="Prix catalogue"
                     type="number" required
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-purple-100 focus:bg-white transition-all font-medium text-lg"
                     value={formData.base_price_per_participant}

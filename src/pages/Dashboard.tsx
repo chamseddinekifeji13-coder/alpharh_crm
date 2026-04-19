@@ -152,7 +152,7 @@ const Dashboard = () => {
   return (
     <div className="dashboard">
       <header className="dashboard-header mb-8">
-        <h1 style={{ fontWeight: 300, color: 'var(--primary)', fontSize: '2.2rem' }}>Tableau de Bord</h1>
+        <h1 className="text-4xl font-light text-[var(--primary)]">Tableau de Bord</h1>
         <p className="text-slate-500">Aperçu en temps réel de votre activité Alpha RH</p>
       </header>
 
@@ -170,7 +170,7 @@ const Dashboard = () => {
               <stat.icon size={24} />
             </div>
             <div className="stat-info">
-              <h3 style={{ fontWeight: 300 }}>{stat.value}</h3>
+              <h3 className="font-light">{stat.value}</h3>
               <p>{stat.label}</p>
             </div>
           </motion.div>
@@ -195,7 +195,7 @@ const Dashboard = () => {
               <stat.icon size={24} />
             </div>
             <div className="stat-info">
-              <h3 style={{ fontWeight: 500 }}>{stat.value}</h3>
+              <h3 className="font-medium">{stat.value}</h3>
               <p>{stat.label}</p>
             </div>
           </motion.div>

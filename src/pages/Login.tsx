@@ -61,7 +61,7 @@ const Login = () => {
       >
         <div className="login-header">
           <Logo size={60} className="mb-6 justify-center" />
-          <h2 className="crm-text-primary" style={{ color: '#a524eb', fontWeight: 500 }}>Alpha RH CRM</h2>
+          <h2 className="text-[#a524eb] font-medium">Alpha RH CRM</h2>
           <p className="crm-text-sm-muted">Système de gestion des talents et formations</p>
         </div>
 

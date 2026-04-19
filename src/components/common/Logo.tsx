@@ -13,51 +13,34 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
   const customLogo = config?.company_logo_url;
 
   return (
-    <div className={`flex items-center gap-3 ${className}`} style={{ maxHeight: size, overflow: 'hidden' }}>
+    <div className={`logo-main-wrapper ${className}`} style={{ maxHeight: size }}>
       {/* Premium Logo Container */}
       <motion.div 
         whileHover={{ scale: 1.05, rotate: 2 }}
         whileTap={{ scale: 0.95 }}
+        className="logo-inner-container"
         style={{ 
           height: size, 
           width: customLogo ? 'auto' : size,
           maxWidth: size * 4,
-          minWidth: customLogo ? '60px' : size,
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          overflow: 'hidden'
+          minWidth: customLogo ? '60px' : size
         }}
       >
         {customLogo ? (
           /* Render uploaded company logo with flexible width but STRICT height */
-          <div style={{ height: size, width: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="logo-custom-img-wrapper" style={{ height: size }}>
             <img 
               src={customLogo} 
               alt="Logo" 
-              style={{ height: '100%', width: 'auto', maxWidth: '240px', objectFit: 'contain' }}
+              className="logo-custom-img"
               onError={(e) => (e.currentTarget.style.display = 'none')} 
             />
           </div>
         ) : (
           /* Fallback to Premium SVG Symbol */
           <>
-            {/* Shadow layer for depth */}
-            <div 
-              className="absolute inset-0 rounded-xl blur-md opacity-20"
-              style={{ backgroundColor: '#a524eb', transform: 'translateY(4px)' }}
-            />
-            
-            {/* Main Background Gradient */}
-            <div 
-              className="absolute inset-0 rounded-xl overflow-hidden"
-              style={{ 
-                background: 'linear-gradient(135deg, #a524eb 0%, #821bc1 100%)',
-                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 12px rgba(165, 36, 235, 0.25)'
-              }}
-            />
+            <div className="logo-fallback-blur" />
+            <div className="logo-fallback-bg" />
 
             {/* Abstract Alpha SVG Symbol */}
             <svg 
@@ -94,10 +77,10 @@ const Logo: React.FC<LogoProps> = ({ className = '', size = 40, withText = false
       {withText && (
         <div className="flex flex-col leading-tight select-none">
           <div className="flex items-center gap-1">
-            <span className="text-xl font-medium tracking-tight" style={{ color: '#a524eb' }}>
+            <span className="text-xl font-medium tracking-tight text-[#a524eb]">
               {(config?.company_name || 'ALPHA').split(' ')[0]}
             </span>
-            <span className="text-xl font-light tracking-tighter" style={{ color: '#7CB342' }}>
+            <span className="text-xl font-light tracking-tighter text-[#7CB342]">
               {(config?.company_name || ' RH').split(' ').slice(1).join(' ') || 'RH'}
             </span>
           </div>
