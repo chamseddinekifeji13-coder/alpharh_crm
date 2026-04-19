@@ -45,9 +45,10 @@
 .sidebar-header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   width: 100%;
   margin-bottom: 1.5rem;
+  position: relative;
 }
 
 .sidebar-logo {
