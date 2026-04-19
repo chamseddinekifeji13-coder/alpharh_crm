@@ -216,14 +216,25 @@ const ParticipantsList = ({ registrations, entreprises, contacts, sessionId, bas
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.entreprise_id) return;
+    
     await trainingService.addRegistration({
       ...formData,
       session_id: sessionId,
       status: 'booked'
     } as any);
-    setShowAdd(false);
+    
+    // Reset state but keep form open for more participants
+    setFormData({
+      entreprise_id: '',
+      contact_id: '',
+      negotiated_price: basePrice,
+      participant_name: '',
+      participant_email: ''
+    });
     onUpdate();
   };
+Line:235: 
 
   const handleDelete = async (id: string) => {
     if (confirm('Désinscrire ce participant ?')) {
@@ -354,8 +365,11 @@ const FinanceBilan = ({ revenue, costs, margin, costsList, sessionId, onUpdate }
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newCost.amount || !newCost.description) return;
+    
     await trainingService.addCost({ ...newCost, session_id: sessionId });
-    setShowAdd(false);
+    // Reset state but KEEP form open for multiple additions
+    setNewCost({ type: 'other', amount: 0, description: '' });
     onUpdate();
   };
 
